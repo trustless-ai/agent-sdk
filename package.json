@@ -1,0 +1,18 @@
+{
+  "name": "@onchain-ai/agent-sdk",
+  "version": "0.1.0",
+  "description": "Off-chain verify/recompute layer for the onchain-ai boundary chain: commit-before-outcome, anchor to public sources, verify any layer's claims trusting no one.",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "files": ["src", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "node test/verify.test.js"
+  },
+  "dependencies": {
+    "@noble/curves": "1.9.7",
+    "@noble/hashes": "1.8.0"
+  },
+  "keywords": ["onchain-ai", "agent", "verifiable", "recompute", "nostr", "schnorr", "commit-before-outcome", "wyriwe"],
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "https://github.com/onchain-ai/agent-sdk.git" }
+}
