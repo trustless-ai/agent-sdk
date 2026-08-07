@@ -15,6 +15,8 @@
 //! byte-identical to trustless-ai/recompute-kit conformance/convention-hash-v0; the hash is DERIVED
 //! from the spec (reproduce, don't trust) and self-checked against the locked identity in tests.
 
+use alloc::format;
+use alloc::string::String;
 use super::recompute::compute_win_rate;
 use sha2::{Digest, Sha256};
 
