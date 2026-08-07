@@ -10,9 +10,9 @@ import {
 } from '../../../src/metering/ERC8312/recompute.js'
 
 // ── Inline golden vectors (primary) ──────────────────────────────────────
-// These reproduce the vectors from recompute-kit/conformance/agent-flow.vectors.json
+// These reproduce the vectors from testkit/vectors/erc8312.vectors.json
 // for step "8312/cap-conservation". They are duplicated here so tests pass
-// even when recompute-kit is not present on disk.
+// even when the vectors file is not present on disk.
 
 const STATE_BOUND_VECTORS = [
   {
@@ -52,11 +52,11 @@ interface ConformanceVector {
 function loadConformanceVectors(step: string): ConformanceVector[] {
   const vectorsPath = path.resolve(
     fileURLToPath(new URL('.', import.meta.url)),
-    '../../../../../recompute-kit/conformance/agent-flow.vectors.json',
+    '../../../../testkit/vectors/erc8312.vectors.json',
   )
   if (!existsSync(vectorsPath)) {
     console.warn(
-      'recompute-kit vectors not found — skipping file-based conformance check',
+      'testkit vectors not found — skipping file-based conformance check',
     )
     return []
   }
@@ -80,11 +80,11 @@ describe('checkStatefulBound (ERC-8312 StatefulBound)', () => {
     }
   })
 
-  describe('conformance vectors from recompute-kit', () => {
+  describe('conformance vectors from testkit', () => {
     const fileVectors = loadConformanceVectors('8312/cap-conservation')
 
     if (fileVectors.length === 0) {
-      it('(no recompute-kit vectors to check — skipping)', () => {
+      it('(no testkit vectors to check — skipping)', () => {
         expect(true).toBe(true)
       })
       return
@@ -141,11 +141,11 @@ describe('checkCursorHeadroom (ERC-8312 Orbmis/headroom)', () => {
     }
   })
 
-  describe('conformance vectors from recompute-kit', () => {
+  describe('conformance vectors from testkit', () => {
     const fileVectors = loadConformanceVectors('8312/cap-conservation')
 
     if (fileVectors.length === 0) {
-      it('(no recompute-kit vectors to check — skipping)', () => {
+      it('(no testkit vectors to check — skipping)', () => {
         expect(true).toBe(true)
       })
       return

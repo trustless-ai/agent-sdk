@@ -5,9 +5,9 @@ import { fileURLToPath } from 'node:url'
 import { computeRawInputHash, computeSanitizationPipelineHash } from '../../../src/verify/ERC8299/recompute.js'
 
 // ── Inline golden vectors (primary) ──────────────────────────────────────
-// These reproduce the vectors from recompute-kit/conformance/agent-flow.vectors.json
+// These reproduce the vectors from testkit/vectors/erc8299-wyriwe.vectors.json
 // for steps "wyriwe/raw" and "wyriwe/pipeline". They are duplicated here so
-// tests pass even when recompute-kit is not present on disk.
+// tests pass even when the vectors file is not present on disk.
 
 const RAW_VECTORS = [
   {
@@ -44,10 +44,10 @@ interface ConformanceVector {
 function loadConformanceVectors(step: string): ConformanceVector[] {
   const vectorsPath = path.resolve(
     fileURLToPath(new URL('.', import.meta.url)),
-    '../../../../../recompute-kit/conformance/agent-flow.vectors.json',
+    '../../../../testkit/vectors/erc8299-wyriwe.vectors.json',
   )
   if (!existsSync(vectorsPath)) {
-    console.warn('recompute-kit vectors not found — skipping file-based conformance check')
+    console.warn('testkit vectors not found — skipping file-based conformance check')
     return []
   }
   const raw = readFileSync(vectorsPath, 'utf-8')
@@ -65,11 +65,11 @@ describe('ERC-8299 recompute functions', () => {
       }
     })
 
-    describe('conformance vectors from recompute-kit', () => {
+    describe('conformance vectors from testkit', () => {
       const fileVectors = loadConformanceVectors('wyriwe/raw')
 
       if (fileVectors.length === 0) {
-        it('(no recompute-kit vectors to check — skipping)', () => {
+        it('(no testkit vectors to check — skipping)', () => {
           expect(true).toBe(true)
         })
         return
@@ -111,11 +111,11 @@ describe('ERC-8299 recompute functions', () => {
       }
     })
 
-    describe('conformance vectors from recompute-kit', () => {
+    describe('conformance vectors from testkit', () => {
       const fileVectors = loadConformanceVectors('wyriwe/pipeline')
 
       if (fileVectors.length === 0) {
-        it('(no recompute-kit vectors to check — skipping)', () => {
+        it('(no testkit vectors to check — skipping)', () => {
           expect(true).toBe(true)
         })
         return

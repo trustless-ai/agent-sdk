@@ -6,9 +6,9 @@ import { computeTaskHash, computeReplyHash } from '../../../src/execution/ERC830
 import type { Hex } from 'viem'
 
 // ── Inline golden vectors (primary) ──────────────────────────────────────
-// These reproduce the vectors from recompute-kit/conformance/agent-flow.vectors.json
+// These reproduce the vectors from testkit/vectors/erc8301-task-hash.vectors.json
 // for step "8301/task-hash". They are duplicated here so tests pass even when
-// recompute-kit is not present on disk.
+// the vectors file is not present on disk.
 
 const EMPTY_PACKED_INNER: Hex =
   '0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470'
@@ -47,10 +47,10 @@ interface ConformanceVector {
 function loadConformanceVectors(step: string): ConformanceVector[] {
   const vectorsPath = path.resolve(
     fileURLToPath(new URL('.', import.meta.url)),
-    '../../../../../recompute-kit/conformance/agent-flow.vectors.json',
+    '../../../../testkit/vectors/erc8301-task-hash.vectors.json',
   )
   if (!existsSync(vectorsPath)) {
-    console.warn('recompute-kit vectors not found — skipping file-based conformance check')
+    console.warn('testkit vectors not found — skipping file-based conformance check')
     return []
   }
   const raw = readFileSync(vectorsPath, 'utf-8')
@@ -73,11 +73,11 @@ describe('computeTaskHash (ERC-8301 recompute)', () => {
     }
   })
 
-  describe('conformance vectors from recompute-kit', () => {
+  describe('conformance vectors from testkit', () => {
     const fileVectors = loadConformanceVectors('8301/task-hash')
 
     if (fileVectors.length === 0) {
-      it('(no recompute-kit vectors to check — skipping)', () => {
+      it('(no testkit vectors to check — skipping)', () => {
         expect(true).toBe(true)
       })
       return
