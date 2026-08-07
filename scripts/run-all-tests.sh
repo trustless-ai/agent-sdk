@@ -51,7 +51,10 @@ note "TypeScript (manages its own anvil)"
 (cd typescript && { npm ci --silent 2>/dev/null || npm install --silent 2>/dev/null; }; npx vitest run) || FAILED="$FAILED typescript"
 
 note "Python"
-(cd python && python3 -m pip install -q -e . && python3 -m pytest -q) || FAILED="$FAILED python"
+# The [dev] extra is where pytest lives. Installing the package alone gives
+# "No module named pytest" -- which passed locally only because the venv
+# already had it, and CI caught on its first run.
+(cd python && python3 -m pip install -q -e ".[dev]" && python3 -m pytest -q) || FAILED="$FAILED python"
 
 note "anvil + deploy (for Go and Rust)"
 bash testkit/scripts/stop-anvil.sh >/dev/null 2>&1 || true
