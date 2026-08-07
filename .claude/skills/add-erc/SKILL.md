@@ -108,6 +108,8 @@ The output has two layers:
      | `concat(a, b)` then keccak | `let mut v = Vec::new(); v.extend_from_slice(a); v.extend_from_slice(b); keccak256(&v)` |
      | `abi.encode(same-type pairs)` | `(val1, val2).abi_encode()` — works for homogeneous types (both FixedBytes, both U256) |
      | `abi.encode(mixed types)` | Use `alloy_core::sol! { struct S { type1 field1; type2 field2; ... } }` then `alloy_core::sol_types::SolValue::abi_encode(&s)` — needed when types differ (e.g. `uint8 + uint256 + bytes32`) because Rust tuples don't blanket-impl `SolValue` for `u8` |
+     | `sha256(bytes)` | `use sha2::Digest; use sha2::Sha256; let h = Sha256::digest(data); FixedBytes::<32>::from_slice(&h)` — note `sha2` crate (already a dependency), NOT `keccak256`. **CRITICAL: ERC-8299 L4 uses sha256, NOT keccak256 — do not mix up.** |
+     | `"sha256:" + sha256(JCS(...))` | JCS (RFC 8785) canonicalization in Rust: (1) Collect keys, sort with `.sort()` (Rust's `&str` sort is lexicographic over UTF-8 bytes = code-point order — correct). (2) Build canonical JSON: `let mut parts = Vec::new(); for k in sorted_keys { let kj = serde_json::to_string(k).unwrap(); let vj = match fields.get(k) { Some(v) => serde_json::to_string(v).unwrap(), None => "null".to_string() }; parts.push(format!("{}:{}", kj, vj)); }` (3) `let canon = format!("{{{}}}", parts.join(","));` (4) `let h = Sha256::digest(canon.as_bytes());` (5) `format!("sha256:{}", hex::encode(h))`. Dependencies: `sha2::Sha256` (already in `Cargo.toml`), `serde_json` (dev-dependency, add to main deps if needed), `hex` (from `alloy_primitives`). |
 
    **e) Go `recompute.go` + inline tests:**
    - Generate `go/<category>/<erc_lowercase>/recompute.go` (lowercase ERC segment, e.g. `erc8275`).
