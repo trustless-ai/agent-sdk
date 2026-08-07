@@ -89,3 +89,55 @@ mod tests {
         assert!(!verify_remaining(150, 60, 100));
     }
 }
+
+#[cfg(test)]
+mod golden_vector_tests {
+    use super::*;
+    use serde_json::Value;
+
+    const VECTORS_STR: &str = include_str!("../../../../testkit/vectors/erc8312.vectors.json");
+
+    #[test]
+    fn golden_vectors() {
+        let data: Value = serde_json::from_str(VECTORS_STR).unwrap();
+        for v in data["vectors"].as_array().unwrap() {
+            let step = v["step"].as_str().unwrap();
+            let expected = v["expected"].as_bool().unwrap();
+            match step {
+                "8312/cap-conservation" => {
+                    let inputs = &v["inputs"];
+                    if inputs.get("reserved").is_some() {
+                        assert_eq!(
+                            check_stateful_bound(
+                                inputs["reserved"].as_u64().unwrap(),
+                                inputs["confirmed"].as_u64().unwrap(),
+                                inputs["cap"].as_u64().unwrap(),
+                            ),
+                            expected
+                        );
+                    } else {
+                        assert_eq!(
+                            check_cursor_headroom(
+                                inputs["aggregate"].as_u64().unwrap(),
+                                inputs["cap"].as_u64().unwrap(),
+                            ),
+                            expected
+                        );
+                    }
+                }
+                "8312/budget-substrate" => {
+                    let inputs = &v["inputs"];
+                    assert_eq!(
+                        verify_remaining(
+                            inputs["cap"].as_u64().unwrap(),
+                            inputs["spent"].as_u64().unwrap(),
+                            inputs["remaining"].as_u64().unwrap(),
+                        ),
+                        expected
+                    );
+                }
+                _ => panic!("unknown step {}", step),
+            }
+        }
+    }
+}

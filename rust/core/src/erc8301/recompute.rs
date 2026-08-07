@@ -199,3 +199,57 @@ mod tests {
         assert_ne!(task, reply);
     }
 }
+
+#[cfg(test)]
+mod golden_vector_tests {
+    use super::*;
+    use alloy_primitives::hex;
+    use serde_json::Value;
+
+    const VECTORS_STR: &str =
+        include_str!("../../../../testkit/vectors/erc8301-task-hash.vectors.json");
+
+    fn fixed_bytes32(s: &str) -> FixedBytes<32> {
+        FixedBytes::<32>::from_slice(&hex::decode(s.trim_start_matches("0x")).unwrap())
+    }
+
+    #[test]
+    fn golden_vectors() {
+        let data: Value = serde_json::from_str(VECTORS_STR).unwrap();
+        for v in data["vectors"].as_array().unwrap() {
+            let step = v["step"].as_str().unwrap();
+            match step {
+                "8301/task-hash" => {
+                    let inputs = &v["inputs"];
+                    let stage = inputs["stage"].as_u64().unwrap() as u8;
+                    let task_seq = U256::from(inputs["taskSeq"].as_u64().unwrap());
+                    let input_hash = fixed_bytes32(inputs["inputHash"].as_str().unwrap());
+                    let timestamp = U256::from(inputs["timestamp"].as_u64().unwrap());
+                    let expires_at = U256::from(inputs["expiresAt"].as_u64().unwrap());
+                    let prev_reply_hashes_packed = hex::decode(
+                        inputs["prevReplyHashesPacked"]
+                            .as_str()
+                            .unwrap()
+                            .trim_start_matches("0x"),
+                    )
+                    .unwrap();
+                    let workflow_run_id = fixed_bytes32(inputs["workflowRunId"].as_str().unwrap());
+                    let expected = fixed_bytes32(v["expected"].as_str().unwrap());
+                    assert_eq!(
+                        compute_task_hash(
+                            stage,
+                            task_seq,
+                            input_hash,
+                            timestamp,
+                            expires_at,
+                            &prev_reply_hashes_packed,
+                            workflow_run_id,
+                        ),
+                        expected
+                    );
+                }
+                _ => panic!("unknown step {}", step),
+            }
+        }
+    }
+}

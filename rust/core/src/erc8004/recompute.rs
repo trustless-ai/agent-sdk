@@ -53,3 +53,32 @@ mod tests {
         assert_eq!(id[24], 0xff); // u64 starts here
     }
 }
+
+#[cfg(test)]
+mod golden_vector_tests {
+    use super::*;
+    use alloy_primitives::hex;
+    use serde_json::Value;
+
+    const VECTORS_STR: &str =
+        include_str!("../../../../testkit/vectors/erc8004-agent-id.vectors.json");
+
+    #[test]
+    fn golden_vectors() {
+        let data: Value = serde_json::from_str(VECTORS_STR).unwrap();
+        for v in data["vectors"].as_array().unwrap() {
+            let step = v["step"].as_str().unwrap();
+            match step {
+                "8004/agent-id" => {
+                    let registry_id = v["inputs"]["registryId"].as_u64().unwrap();
+                    let expected_bytes =
+                        hex::decode(v["expected"].as_str().unwrap().trim_start_matches("0x"))
+                            .unwrap();
+                    let expected = FixedBytes::<32>::from_slice(&expected_bytes);
+                    assert_eq!(compute_agent_id(registry_id), expected);
+                }
+                _ => panic!("unknown step {}", step),
+            }
+        }
+    }
+}

@@ -63,3 +63,30 @@ mod tests {
         assert_eq!(compute_win_rate(57, 686), Some(767));
     }
 }
+
+#[cfg(test)]
+mod golden_vector_tests {
+    use super::*;
+    use serde_json::Value;
+
+    const VECTORS_STR: &str =
+        include_str!("../../../../testkit/vectors/erc8275-reputation.vectors.json");
+
+    #[test]
+    fn golden_vectors() {
+        let data: Value = serde_json::from_str(VECTORS_STR).unwrap();
+        for v in data["vectors"].as_array().unwrap() {
+            let step = v["step"].as_str().unwrap();
+            match step {
+                "8275/reputation" => {
+                    let wins = v["inputs"]["commit_gated_wins"].as_u64().unwrap();
+                    let losses = v["inputs"]["commit_gated_losses"].as_u64().unwrap();
+                    // expected is a float rate (e.g. 0.5161) — convert to basis points
+                    let expected = (v["expected"].as_f64().unwrap() * 10000.0).round() as u64;
+                    assert_eq!(compute_win_rate(wins, losses), Some(expected));
+                }
+                _ => panic!("unknown step {}", step),
+            }
+        }
+    }
+}

@@ -223,3 +223,82 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod golden_vector_tests {
+    use super::*;
+    use serde_json::Value;
+
+    const WYRIWE_VECTORS_STR: &str =
+        include_str!("../../../../testkit/vectors/erc8299-wyriwe.vectors.json");
+    const L4_VECTORS_STR: &str =
+        include_str!("../../../../testkit/vectors/erc8299-l4.vectors.json");
+
+    fn fixed_bytes32(s: &str) -> FixedBytes<32> {
+        FixedBytes::<32>::from_slice(&hex::decode(s.trim_start_matches("0x")).unwrap())
+    }
+
+    #[test]
+    fn golden_vectors_wyriwe() {
+        let data: Value = serde_json::from_str(WYRIWE_VECTORS_STR).unwrap();
+        for v in data["vectors"].as_array().unwrap() {
+            let step = v["step"].as_str().unwrap();
+            match step {
+                "wyriwe/raw" => {
+                    let raw = hex::decode(
+                        v["inputs"]["raw_input_hex"]
+                            .as_str()
+                            .unwrap()
+                            .trim_start_matches("0x"),
+                    )
+                    .unwrap();
+                    assert_eq!(
+                        compute_raw_input_hash(&raw),
+                        fixed_bytes32(v["expected"].as_str().unwrap())
+                    );
+                }
+                "wyriwe/pipeline" => {
+                    let cid = v["inputs"]["spec_cid"].as_str().unwrap();
+                    let raw_input_hash =
+                        fixed_bytes32(v["inputs"]["raw_input_hash"].as_str().unwrap());
+                    assert_eq!(
+                        compute_sanitization_pipeline_hash(cid, raw_input_hash),
+                        fixed_bytes32(v["expected"].as_str().unwrap())
+                    );
+                }
+                _ => panic!("unknown step {}", step),
+            }
+        }
+    }
+
+    #[test]
+    fn golden_vectors_l4() {
+        let data: Value = serde_json::from_str(L4_VECTORS_STR).unwrap();
+        for v in data["vectors"].as_array().unwrap() {
+            let step = v["step"].as_str().unwrap();
+            match step {
+                "8299-l4/raw-proposal-hash" => {
+                    let artifact = v["inputs"]["artifact"].as_str().unwrap();
+                    let expected = v["expected"].as_str().unwrap().to_string();
+                    assert_eq!(compute_raw_proposal_hash(artifact), expected);
+                }
+                "8299-l4/verdict-hash" => {
+                    let fields_obj = v["inputs"]["fields"].as_object().unwrap();
+                    let fields: Vec<(&str, Option<&str>)> = fields_obj
+                        .iter()
+                        .map(|(k, val)| (k.as_str(), val.as_str()))
+                        .collect();
+                    let preimage_fields: Vec<&str> = v["inputs"]["preimage_fields"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|k| k.as_str().unwrap())
+                        .collect();
+                    let expected = v["expected"].as_str().unwrap().to_string();
+                    assert_eq!(compute_verdict_hash(&fields, &preimage_fields), expected);
+                }
+                _ => panic!("unknown step {}", step),
+            }
+        }
+    }
+}
