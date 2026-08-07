@@ -1,9 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { privateKeyToAccount } from 'viem/accounts'
 import { IdentityRegistryClient } from '../../../src/identity/ERC8004/client.js'
-import { ANVIL_RPC_URL, deployContract, ensureAnvil, getAnvilAccount } from '../../setup/deploy.js'
-
-ensureAnvil()
+import { ANVIL_RPC_URL, deployContract, getAnvilAccount } from '../../setup/deploy.js'
 
 describe('IdentityRegistryClient (ERC-8004)', () => {
   let client: IdentityRegistryClient

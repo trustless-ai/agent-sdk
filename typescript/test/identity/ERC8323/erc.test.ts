@@ -1,12 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { privateKeyToAccount } from 'viem/accounts'
 import { SourceBindingClient } from '../../../src/identity/ERC8323/client.js'
-import { ANVIL_RPC_URL, deployContracts, ensureAnvil, getAnvilAccount } from '../../setup/deploy.js'
+import { ANVIL_RPC_URL, deployContracts, getAnvilAccount } from '../../setup/deploy.js'
 
 // Matches MockAgentSourceBinding.MINT_PRICE (0.001 ether, in wei).
 const MINT_PRICE = 10n ** 15n
-
-ensureAnvil()
 
 describe('SourceBindingClient (ERC-8323)', () => {
   let client: SourceBindingClient

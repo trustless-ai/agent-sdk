@@ -3,9 +3,7 @@ import { keccak256, toHex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { ObservationCommitmentClient } from '../../../src/verify/ERC8281/client.js'
 import { computeObservationDigest } from '../../../src/verify/ERC8281/recompute.js'
-import { ANVIL_RPC_URL, deployContract, ensureAnvil, getAnvilAccount } from '../../setup/deploy.js'
-
-ensureAnvil()
+import { ANVIL_RPC_URL, deployContract, getAnvilAccount } from '../../setup/deploy.js'
 
 describe('ObservationCommitmentClient (ERC-8281)', () => {
   let client: ObservationCommitmentClient

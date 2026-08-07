@@ -4,9 +4,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { BoundedAgentActionClient } from '../../../src/metering/ERC8312/boundedAgentActionClient.js'
 import { BudgetSubstrateClient } from '../../../src/metering/ERC8312/budgetSubstrateClient.js'
 import { ContestableEnvelopeClient } from '../../../src/metering/ERC8312/contestableEnvelopeClient.js'
-import { ANVIL_RPC_URL, deployContracts, ensureAnvil, getAnvilAccount } from '../../setup/deploy.js'
-
-ensureAnvil()
+import { ANVIL_RPC_URL, deployContracts, getAnvilAccount } from '../../setup/deploy.js'
 
 describe('ERC-8312 metering clients', () => {
   let boundedClient: BoundedAgentActionClient

@@ -3,9 +3,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { keccak256, toHex } from 'viem'
 import { AgentWorkflowClient } from '../../../src/execution/ERC8301/client.js'
 import type { AgentReply } from '../../../src/execution/ERC8301/types.js'
-import { ANVIL_RPC_URL, deployContract, ensureAnvil, getAnvilAccount } from '../../setup/deploy.js'
-
-ensureAnvil()
+import { ANVIL_RPC_URL, deployContract, getAnvilAccount } from '../../setup/deploy.js'
 
 describe('AgentWorkflowClient (ERC-8301)', () => {
   let client: AgentWorkflowClient

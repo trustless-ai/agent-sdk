@@ -1,9 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { privateKeyToAccount } from 'viem/accounts'
 import { OnChainProofClient } from '../../../src/anchor/ERC8263/client.js'
-import { ANVIL_RPC_URL, deployContract, ensureAnvil, getAnvilAccount } from '../../setup/deploy.js'
-
-ensureAnvil()
+import { ANVIL_RPC_URL, deployContract, getAnvilAccount } from '../../setup/deploy.js'
 
 describe('OnChainProofClient (ERC-8263)', () => {
   let client: OnChainProofClient

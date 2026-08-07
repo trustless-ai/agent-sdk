@@ -4,9 +4,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { ProofVerifierClient } from '../../../src/verify/ERC8274/proofVerifierClient.js'
 import { AgentVerifierClient } from '../../../src/verify/ERC8274/agentVerifierClient.js'
 import { getTrustedVerifier } from '../../../src/verify/ERC8274/agentVerifiable.js'
-import { ANVIL_RPC_URL, deployContracts, ensureAnvil, getAnvilAccount } from '../../setup/deploy.js'
-
-ensureAnvil()
+import { ANVIL_RPC_URL, deployContracts, getAnvilAccount } from '../../setup/deploy.js'
 
 describe('ERC-8274 verify clients', () => {
   let proofVerifierClient: ProofVerifierClient

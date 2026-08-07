@@ -3,10 +3,8 @@ import { keccak256, stringToHex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { AgentReputationClient } from '../../../src/reputation/ERC8275/client.js'
 import { computeWinRate } from '../../../src/reputation/ERC8275/recompute.js'
-import { ANVIL_RPC_URL, deployContract, ensureAnvil, getAnvilAccount } from '../../setup/deploy.js'
+import { ANVIL_RPC_URL, deployContract, getAnvilAccount } from '../../setup/deploy.js'
 import type { Hex } from 'viem'
-
-ensureAnvil()
 
 describe('AgentReputationClient (ERC-8275)', () => {
   let client: AgentReputationClient
