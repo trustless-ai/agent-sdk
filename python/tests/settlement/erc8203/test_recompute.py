@@ -24,17 +24,17 @@ INLINE_VECTORS = [
 
 
 def _conformance_vectors():
-    """Read recompute-kit golden vectors for 8203/settlement-proof.
+    """Read repo-local golden vectors for 8203/settlement-proof (testkit/vectors).
 
     Returns an empty list if the file is not present (the inline vectors in
     INLINE_VECTORS are the primary assertion; the file-based check is a
     secondary cross-check).
     """
     vectors_path = (
-        Path(__file__).resolve().parents[5]
-        / "recompute-kit"
-        / "conformance"
-        / "agent-flow.vectors.json"
+        Path(__file__).resolve().parents[4]
+        / "testkit"
+        / "vectors"
+        / "erc8203-settlement-proof.vectors.json"
     )
     if not vectors_path.exists():
         return []
@@ -57,7 +57,7 @@ class TestComputeVerdictHash:
     def test_conformance_vectors_from_file(self):
         file_vectors = _conformance_vectors()
         if not file_vectors:
-            pytest.skip("recompute-kit vectors not found — skipping file-based conformance check")
+            pytest.skip("testkit vectors not found — skipping file-based conformance check")
 
         for vec in file_vectors:
             job_id = vec["inputs"]["jobId"]

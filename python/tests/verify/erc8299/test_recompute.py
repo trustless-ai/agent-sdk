@@ -33,17 +33,17 @@ PIPELINE_INLINE_VECTORS = [
 
 
 def _conformance_vectors(step):
-    """Read recompute-kit golden vectors for the given step.
+    """Read repo-local testkit golden vectors for the given step.
 
     Returns an empty list if the file is not present (the inline vectors
     are the primary assertion; the file-based check is a secondary
     cross-check).
     """
     vectors_path = (
-        Path(__file__).resolve().parents[5]
-        / "recompute-kit"
-        / "conformance"
-        / "agent-flow.vectors.json"
+        Path(__file__).resolve().parents[4]
+        / "testkit"
+        / "vectors"
+        / "erc8299-wyriwe.vectors.json"
     )
     if not vectors_path.exists():
         return []
@@ -66,7 +66,7 @@ class TestComputeRawInputHash:
     def test_conformance_vectors_from_file(self):
         file_vectors = _conformance_vectors("wyriwe/raw")
         if not file_vectors:
-            pytest.skip("recompute-kit vectors not found — skipping file-based conformance check")
+            pytest.skip("testkit vectors not found — skipping file-based conformance check")
 
         for vec in file_vectors:
             label = f"{vec['id']}: {vec.get('desc', vec.get('spec', '(no description)'))}"
@@ -104,7 +104,7 @@ class TestComputeSanitizationPipelineHash:
     def test_conformance_vectors_from_file(self):
         file_vectors = _conformance_vectors("wyriwe/pipeline")
         if not file_vectors:
-            pytest.skip("recompute-kit vectors not found — skipping file-based conformance check")
+            pytest.skip("testkit vectors not found — skipping file-based conformance check")
 
         for vec in file_vectors:
             label = f"{vec['id']}: {vec.get('desc', vec.get('spec', '(no description)'))}"
