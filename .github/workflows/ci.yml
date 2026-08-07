@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: all suites (TypeScript, Python, Go, Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The testkit's foundry remapping is @agent-ercs/=../agent-ercs/contracts/,
+      # resolved from testkit/, so the interfaces repo must land at ./agent-ercs.
+      # Without it the mocks do not compile and every on-chain suite fails with a
+      # missing-source error that reads like broken code.
+      - name: Check out agent-ercs (the interfaces this SDK is built against)
+        uses: actions/checkout@v4
+        with:
+          repository: trustless-ai/agent-ercs
+          path: agent-ercs
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Everything runs in ONE step on purpose. The suites share an anvil, and
+      # splitting them across steps kills it in between — every integration test
+      # then reports "ADDRESS not set", which reads as a broken suite rather than
+      # a dead node.
+      - name: Run every suite
+        run: ./scripts/run-all-tests.sh

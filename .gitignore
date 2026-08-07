@@ -18,3 +18,7 @@ testkit/broadcast/
 testkit/.anvil.pid
 testkit/.anvil.log
 testkit/.anvil-accounts.json
+
+# The interfaces repo, cloned here by CI and by scripts/run-all-tests.sh.
+# Checked out, never vendored.
+agent-ercs/

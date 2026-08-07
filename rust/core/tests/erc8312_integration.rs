@@ -63,7 +63,7 @@ fn anvil_key() -> String {
 fn addresses() -> Vec<Address> {
     std::env::var("ERC8312_ADDRESSES")
         .unwrap_or_default()
-        .split(',')
+        .split_whitespace()
         .filter(|s| !s.is_empty())
         .map(|s| s.parse().expect("invalid address"))
         .collect()
@@ -83,7 +83,7 @@ fn deploy_addresses() -> Vec<Address> {
     assert!(output.status.success(), "deploy.sh failed");
     String::from_utf8_lossy(&output.stdout)
         .trim()
-        .split('\n')
+        .split_whitespace()
         .filter(|s| !s.is_empty())
         .map(|s| s.parse().expect("invalid address"))
         .collect()

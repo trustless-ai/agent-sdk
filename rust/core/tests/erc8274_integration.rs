@@ -47,7 +47,7 @@ fn anvil_key() -> String {
 fn addresses() -> Vec<Address> {
     std::env::var("ERC8274_ADDRESSES")
         .unwrap_or_default()
-        .split(',')
+        .split_whitespace()
         .filter(|s| !s.is_empty())
         .map(|s| s.parse().expect("invalid address"))
         .collect()

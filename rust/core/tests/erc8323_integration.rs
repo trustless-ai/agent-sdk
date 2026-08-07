@@ -33,7 +33,15 @@ fn anvil_key() -> String {
 }
 
 fn contract_address() -> Address {
+    // DeployERC8323 deploys two contracts and the suites read both from this one
+    // variable, in broadcast order: [0] the dummy collection, [1] the binding
+    // registry (see go/test/erc8323_integration_test.go, which documents the
+    // same ordering). This test constructs IAgentSourceBinding, so it wants the
+    // binding registry -- the LAST address, not the whole string.
     std::env::var("ERC8323_ADDRESS")
+        .unwrap_or_default()
+        .split_whitespace()
+        .last()
         .unwrap_or_default()
         .parse()
         .unwrap_or(Address::ZERO)
