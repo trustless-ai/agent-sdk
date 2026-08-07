@@ -3,8 +3,10 @@ import { keccak256, stringToHex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { ConsultEscrowClient } from '../../../src/settlement/ERC8203/client.js'
 import { computeVerdictHash } from '../../../src/settlement/ERC8203/recompute.js'
-import { ANVIL_RPC_URL, deployContract, getAnvilAccount } from '../../setup/deploy.js'
+import { ANVIL_RPC_URL, deployContract, ensureAnvil, getAnvilAccount } from '../../setup/deploy.js'
 import type { Hex } from 'viem'
+
+ensureAnvil()
 
 describe('ConsultEscrowClient (ERC-8203)', () => {
   let client: ConsultEscrowClient

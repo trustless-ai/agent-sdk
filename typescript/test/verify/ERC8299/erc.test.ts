@@ -3,7 +3,9 @@ import { encodeAbiParameters, keccak256, toHex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { WyriweAttestationClient } from '../../../src/verify/ERC8299/wyriweAttestationClient.js'
 import { JudgmentExecutionClient } from '../../../src/verify/ERC8299/judgmentExecutionClient.js'
-import { ANVIL_RPC_URL, deployContracts, getAnvilAccount } from '../../setup/deploy.js'
+import { ANVIL_RPC_URL, deployContracts, ensureAnvil, getAnvilAccount } from '../../setup/deploy.js'
+
+ensureAnvil()
 
 describe('ERC-8299 verify clients', () => {
   let wyriweClient: WyriweAttestationClient

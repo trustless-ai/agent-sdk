@@ -1,11 +1,22 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const testkitDir = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../testkit')
 
 export const ANVIL_RPC_URL = 'http://127.0.0.1:8545'
+
+// Call at module level in every integration test file — vitest swallows
+// errors inside describe(), but module-level throws are not caught.
+export function ensureAnvil(): void {
+  const accountsPath = path.join(testkitDir, '.anvil-accounts.json')
+  if (!existsSync(accountsPath)) {
+    throw new Error(
+      `${accountsPath} not found — start anvil first: testkit/scripts/start-anvil.sh`,
+    )
+  }
+}
 
 export interface AnvilAccount {
   address: `0x${string}`
