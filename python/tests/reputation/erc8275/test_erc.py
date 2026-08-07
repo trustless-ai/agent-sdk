@@ -52,9 +52,9 @@ class TestAgentReputationClient:
 
     def test_compute_win_rate(self, deploy_contract, anvil_rpc_url, anvil_account):
         """Recompute-to-verify: computeWinRate from public inputs (no contract needed)."""
-        assert compute_win_rate(16, 15) == 0.5161
-        assert compute_win_rate(10, 0) == 1.0
-        assert compute_win_rate(0, 10) == 0.0
+        assert compute_win_rate(16, 15) == 5161
+        assert compute_win_rate(10, 0) == 10000
+        assert compute_win_rate(0, 10) == 0
 
         with pytest.raises(ValueError):
             compute_win_rate(0, 0)

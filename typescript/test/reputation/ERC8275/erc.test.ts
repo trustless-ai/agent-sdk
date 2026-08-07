@@ -47,11 +47,11 @@ describe('AgentReputationClient (ERC-8275)', () => {
 
   describe('computeWinRate (recompute)', () => {
     it('computes win rate from golden vector: 16 wins, 15 losses', () => {
-      expect(computeWinRate(16, 15)).toBe(0.5161)
+      expect(computeWinRate(16, 15)).toBe(5161)
     })
 
     it('handles perfect record (non-zero wins, zero losses)', () => {
-      expect(computeWinRate(10, 0)).toBe(1)
+      expect(computeWinRate(10, 0)).toBe(10000)
     })
 
     it('handles zero wins, non-zero losses', () => {
