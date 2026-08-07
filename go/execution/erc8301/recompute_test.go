@@ -1,7 +1,10 @@
 package erc8301
 
 import (
+	"encoding/json"
 	"math/big"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -250,4 +253,85 @@ func computeTaskHashWithInner(stage uint8, taskSeq uint64, inputHash common.Hash
 		return common.Hash{}, err
 	}
 	return crypto.Keccak256Hash(packed), nil
+}
+
+// vectorFile is the top-level shape of testkit/vectors/*.vectors.json.
+type vectorFile struct {
+	Vectors []vector `json:"vectors"`
+}
+
+// vector is one golden vector: a step identifier, the recompute inputs, and
+// the expected output. Inputs and expected are kept as raw JSON because
+// their shape depends on the step.
+type vector struct {
+	Step     string          `json:"step"`
+	Inputs   json.RawMessage `json:"inputs"`
+	Expected json.RawMessage `json:"expected"`
+}
+
+// loadVectors reads the ERC-8301 golden vectors published at
+// testkit/vectors/erc8301-task-hash.vectors.json. The path is relative to
+// this package's directory (go test runs with the package dir as the
+// working directory): ../../../testkit/vectors/erc8301-task-hash.vectors.json.
+func loadVectors(t *testing.T) []vector {
+	t.Helper()
+	path := filepath.Join("..", "..", "..", "testkit", "vectors", "erc8301-task-hash.vectors.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Skipf("vectors not found — skipping: %v", err)
+		return nil
+	}
+	var file vectorFile
+	if err := json.Unmarshal(raw, &file); err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	return file.Vectors
+}
+
+// TestVectorsFile runs every cross-lane vector from
+// testkit/vectors/erc8301-task-hash.vectors.json against the Go recompute —
+// any future lane adding a vector here must reproduce it too. The empty
+// prevReplyHashesPacked hex ("0x") decodes to nil, exercising the critical
+// empty-array edge case the golden vector pins.
+func TestVectorsFile(t *testing.T) {
+	for _, v := range loadVectors(t) {
+		v := v
+		t.Run(v.Step, func(t *testing.T) {
+			switch v.Step {
+			case "8301/task-hash":
+				var in struct {
+					Stage                 uint8  `json:"stage"`
+					TaskSeq               uint64 `json:"taskSeq"`
+					InputHash             string `json:"inputHash"`
+					Timestamp             uint64 `json:"timestamp"`
+					ExpiresAt             uint64 `json:"expiresAt"`
+					PrevReplyHashesPacked string `json:"prevReplyHashesPacked"`
+					WorkflowRunID         string `json:"workflowRunId"`
+				}
+				if err := json.Unmarshal(v.Inputs, &in); err != nil {
+					t.Fatalf("unmarshal inputs: %v", err)
+				}
+				var wantHex string
+				if err := json.Unmarshal(v.Expected, &wantHex); err != nil {
+					t.Fatalf("unmarshal expected: %v", err)
+				}
+				got, err := ComputeTaskHash(
+					in.Stage, in.TaskSeq,
+					common.HexToHash(in.InputHash),
+					in.Timestamp, in.ExpiresAt,
+					common.FromHex(in.PrevReplyHashesPacked),
+					common.HexToHash(in.WorkflowRunID),
+				)
+				if err != nil {
+					t.Fatalf("ComputeTaskHash returned error: %v", err)
+				}
+				want := common.HexToHash(wantHex)
+				if got != want {
+					t.Errorf("ComputeTaskHash = %s, want %s", got.Hex(), want.Hex())
+				}
+			default:
+				t.Fatalf("unknown vector step %q", v.Step)
+			}
+		})
+	}
 }

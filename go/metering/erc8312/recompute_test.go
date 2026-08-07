@@ -1,6 +1,11 @@
 package erc8312
 
-import "testing"
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 // Golden vector from recompute-kit "8312/cap-conservation": reserved=100,
 // confirmed=0, cap=150 → holds.
@@ -110,5 +115,104 @@ func TestVerifyRemainingBoundaries(t *testing.T) {
 	}
 	if !VerifyRemaining(150, 0, 150) {
 		t.Error("VerifyRemaining(150, 0, 150) = false, want true (untouched budget)")
+	}
+}
+
+// vectorFile is the top-level shape of testkit/vectors/*.vectors.json.
+type vectorFile struct {
+	Vectors []vector `json:"vectors"`
+}
+
+// vector is one golden vector: a step identifier, the recompute inputs, and
+// the expected output. Inputs and expected are kept as raw JSON because
+// their shape depends on the step.
+type vector struct {
+	Step     string          `json:"step"`
+	Inputs   json.RawMessage `json:"inputs"`
+	Expected json.RawMessage `json:"expected"`
+}
+
+// loadVectors reads the ERC-8312 golden vectors published at
+// testkit/vectors/erc8312.vectors.json. The path is relative to this
+// package's directory (go test runs with the package dir as the working
+// directory): ../../../testkit/vectors/erc8312.vectors.json.
+func loadVectors(t *testing.T) []vector {
+	t.Helper()
+	path := filepath.Join("..", "..", "..", "testkit", "vectors", "erc8312.vectors.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Skipf("vectors not found — skipping: %v", err)
+		return nil
+	}
+	var file vectorFile
+	if err := json.Unmarshal(raw, &file); err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	return file.Vectors
+}
+
+// TestVectorsFile runs every cross-lane vector from
+// testkit/vectors/erc8312.vectors.json against the Go recompute — any future
+// lane adding a vector here must reproduce it too. The cap-conservation
+// step appears in two input shapes: {reserved, confirmed, cap} exercises
+// CheckStatefulBound, {aggregate, cap} exercises CheckCursorHeadroom.
+func TestVectorsFile(t *testing.T) {
+	for _, v := range loadVectors(t) {
+		v := v
+		t.Run(v.Step, func(t *testing.T) {
+			switch v.Step {
+			case "8312/cap-conservation":
+				var in struct {
+					Reserved  *uint64 `json:"reserved"`
+					Confirmed *uint64 `json:"confirmed"`
+					Aggregate *uint64 `json:"aggregate"`
+					Cap       *uint64 `json:"cap"`
+				}
+				if err := json.Unmarshal(v.Inputs, &in); err != nil {
+					t.Fatalf("unmarshal inputs: %v", err)
+				}
+				var want bool
+				if err := json.Unmarshal(v.Expected, &want); err != nil {
+					t.Fatalf("unmarshal expected: %v", err)
+				}
+				var got bool
+				switch {
+				case in.Reserved != nil:
+					if in.Confirmed == nil || in.Cap == nil {
+						t.Fatal("cap-conservation vector missing reserved/confirmed/cap")
+					}
+					got = CheckStatefulBound(*in.Reserved, *in.Confirmed, *in.Cap)
+				case in.Aggregate != nil:
+					if in.Cap == nil {
+						t.Fatal("cap-conservation vector missing aggregate/cap")
+					}
+					got = CheckCursorHeadroom(*in.Aggregate, *in.Cap)
+				default:
+					t.Fatal("cap-conservation vector has neither reserved nor aggregate inputs")
+				}
+				if got != want {
+					t.Errorf("cap-conservation vector %q = %v, want %v", v.Step, got, want)
+				}
+			case "8312/budget-substrate":
+				var in struct {
+					Cap       uint64 `json:"cap"`
+					Spent     uint64 `json:"spent"`
+					Remaining uint64 `json:"remaining"`
+				}
+				if err := json.Unmarshal(v.Inputs, &in); err != nil {
+					t.Fatalf("unmarshal inputs: %v", err)
+				}
+				var want bool
+				if err := json.Unmarshal(v.Expected, &want); err != nil {
+					t.Fatalf("unmarshal expected: %v", err)
+				}
+				got := VerifyRemaining(in.Cap, in.Spent, in.Remaining)
+				if got != want {
+					t.Errorf("VerifyRemaining(%d, %d, %d) = %v, want %v", in.Cap, in.Spent, in.Remaining, got, want)
+				}
+			default:
+				t.Fatalf("unknown vector step %q", v.Step)
+			}
+		})
 	}
 }

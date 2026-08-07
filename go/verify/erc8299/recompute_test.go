@@ -214,3 +214,86 @@ func TestL4VectorsFile(t *testing.T) {
 		})
 	}
 }
+
+// vectorFile is the top-level shape of testkit/vectors/*.vectors.json.
+type vectorFile struct {
+	Vectors []vector `json:"vectors"`
+}
+
+// vector is one golden vector: a step identifier, the recompute inputs, and
+// the expected output. Inputs and expected are kept as raw JSON because
+// their shape depends on the step.
+type vector struct {
+	Step     string          `json:"step"`
+	Inputs   json.RawMessage `json:"inputs"`
+	Expected json.RawMessage `json:"expected"`
+}
+
+// loadVectors reads the ERC-8299 wyriwe golden vectors published at
+// testkit/vectors/erc8299-wyriwe.vectors.json. The path is relative to this
+// package's directory (go test runs with the package dir as the working
+// directory): ../../../testkit/vectors/erc8299-wyriwe.vectors.json.
+func loadVectors(t *testing.T) []vector {
+	t.Helper()
+	path := filepath.Join("..", "..", "..", "testkit", "vectors", "erc8299-wyriwe.vectors.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Skipf("vectors not found — skipping: %v", err)
+		return nil
+	}
+	var file vectorFile
+	if err := json.Unmarshal(raw, &file); err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	return file.Vectors
+}
+
+// TestVectorsFile runs every cross-lane wyriwe vector from
+// testkit/vectors/erc8299-wyriwe.vectors.json against the Go recompute — any
+// future lane adding a vector here must reproduce it too. (The L4 vectors
+// live in their own file, exercised by TestL4VectorsFile.)
+func TestVectorsFile(t *testing.T) {
+	for _, v := range loadVectors(t) {
+		v := v
+		t.Run(v.Step, func(t *testing.T) {
+			switch v.Step {
+			case "wyriwe/raw":
+				var in struct {
+					RawInputHex string `json:"raw_input_hex"`
+				}
+				if err := json.Unmarshal(v.Inputs, &in); err != nil {
+					t.Fatalf("unmarshal inputs: %v", err)
+				}
+				var wantHex string
+				if err := json.Unmarshal(v.Expected, &wantHex); err != nil {
+					t.Fatalf("unmarshal expected: %v", err)
+				}
+				got := ComputeRawInputHash(common.FromHex(in.RawInputHex))
+				want := common.HexToHash(wantHex)
+				if got != want {
+					t.Errorf("ComputeRawInputHash(%s) = %s, want %s", in.RawInputHex, got.Hex(), want.Hex())
+				}
+			case "wyriwe/pipeline":
+				var in struct {
+					SpecCID      string `json:"spec_cid"`
+					RawInputHash string `json:"raw_input_hash"`
+				}
+				if err := json.Unmarshal(v.Inputs, &in); err != nil {
+					t.Fatalf("unmarshal inputs: %v", err)
+				}
+				var wantHex string
+				if err := json.Unmarshal(v.Expected, &wantHex); err != nil {
+					t.Fatalf("unmarshal expected: %v", err)
+				}
+				got := ComputeSanitizationPipelineHash(in.SpecCID, common.HexToHash(in.RawInputHash))
+				want := common.HexToHash(wantHex)
+				if got != want {
+					t.Errorf("ComputeSanitizationPipelineHash(%q, %s) = %s, want %s",
+						in.SpecCID, in.RawInputHash, got.Hex(), want.Hex())
+				}
+			default:
+				t.Fatalf("unknown vector step %q", v.Step)
+			}
+		})
+	}
+}
