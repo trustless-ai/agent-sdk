@@ -47,10 +47,10 @@ fn contract_address() -> Address {
 #[tokio::test]
 async fn anchors_emit_anchor_proof_events() {
     let addr = contract_address();
-    if addr.is_zero() {
-        eprintln!("SKIP: ERC8263_ADDRESS not set");
-        return;
-    }
+    assert!(
+        !addr.is_zero(),
+        "ERC8263_ADDRESS not set — deploy first via testkit/scripts/deploy.sh anchor/ERC8263 DeployERC8263"
+    );
 
     let key = anvil_key();
     let signer: alloy::signers::local::PrivateKeySigner = key.parse().expect("invalid key");
@@ -121,10 +121,10 @@ async fn anchors_emit_anchor_proof_events() {
 #[tokio::test]
 async fn rejects_invalid_anchors() {
     let addr = contract_address();
-    if addr.is_zero() {
-        eprintln!("SKIP: ERC8263_ADDRESS not set");
-        return;
-    }
+    assert!(
+        !addr.is_zero(),
+        "ERC8263_ADDRESS not set — deploy first via testkit/scripts/deploy.sh anchor/ERC8263 DeployERC8263"
+    );
 
     let key = anvil_key();
     let signer: alloy::signers::local::PrivateKeySigner = key.parse().expect("invalid key");
