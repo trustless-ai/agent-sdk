@@ -1,0 +1,23 @@
+{
+  "schema": "agent-sdk.golden-vectors.v0",
+  "source": "recompute-kit/conformance/agent-flow.vectors.json",
+  "note": "Golden conformance vectors for ERC-8301-task-hash. Every language port MUST reproduce expected exactly.",
+  "vectors": [
+    {
+      "id": "8301-task-hash",
+      "step": "8301/task-hash",
+      "spec": "ERC-8301 (ethereum/ERCs PR #1815, \u00a7AgentTask)",
+      "desc": "INITIAL-task taskHash, order+types confirmed vs filed erc-8301.md. GUARDS Fede's empty-array edge: prevReplyHashes empty \u2192 inner = keccak256(abi.encodePacked([])) = keccak256('')=0xc5d2\u2026a470, NOT bytes32(0) \u2014 an impl that special-cases the empty array to 0x0 fails this vector.",
+      "inputs": {
+        "stage": 1,
+        "taskSeq": 0,
+        "inputHash": "0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8",
+        "timestamp": 1700000000,
+        "expiresAt": 1700001000,
+        "prevReplyHashesPacked": "0x",
+        "workflowRunId": "0x00000000000000000000000000000000000000000000000000000000deadbeef"
+      },
+      "expected": "0xf1f404c844a4aff1d0d7d17cebb518a2d386197aad09ab86517eaa01448301ec"
+    }
+  ]
+}

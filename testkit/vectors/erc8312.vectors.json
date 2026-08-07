@@ -1,0 +1,78 @@
+{
+  "schema": "agent-sdk.golden-vectors.v0",
+  "source": "recompute-kit/conformance/agent-flow.vectors.json",
+  "note": "Golden conformance vectors for ERC-8312. Every language port MUST reproduce expected exactly.",
+  "vectors": [
+    {
+      "id": "cap-conservation-holds",
+      "step": "8312/cap-conservation",
+      "spec": "ERC-8312 \u2014 bounded agent actions (cap invariant + Security clause: confirm/cancel bind to reserver)",
+      "desc": "reserved+confirmed \u2264 cap holds. Real captured state from Atlas-Protocol-AI/zero-human-loop @ 5530a9c, StatefulBound 0x3f79\u2026faac, mandateId 0x9e3e\u202605bbe on Base Sepolia (storage-proven vs stateRoot).",
+      "inputs": {
+        "reserved": 100,
+        "confirmed": 0,
+        "cap": 150
+      },
+      "expected": true
+    },
+    {
+      "id": "cap-conservation-holds-headroom",
+      "step": "8312/cap-conservation",
+      "spec": "ERC-8312 \u2014 bounded agent actions (cap invariant, struct/turnover-cursor layout)",
+      "desc": "Second independent implementation of the same invariant: orbmis/headroom CURSOR_HEADROOM (cumulativeTurnover \u2264 maxCumulativeTurnover), distinct from StatefulBound's reserved+confirmed aggregate. Real captured state from EnvelopeRegistry 0x091f665B\u202607d1, envelope 0x48e972a2\u2026bcb041 on Base Sepolia (84532), storage-proven vs stateRoot @ block 43697520 (0xbb4fbc63\u2026) \u2014 cursorValues @ mapping-slot 2, agg=cumulativeTurnover(+2), cap=maxCumulativeTurnover(+1): recompute-step form `struct:2:2:1`.",
+      "inputs": {
+        "aggregate": 0,
+        "cap": 8000
+      },
+      "expected": true
+    },
+    {
+      "id": "cap-conservation-breach",
+      "step": "8312/cap-conservation",
+      "spec": "ERC-8312 \u2014 bounded agent actions",
+      "desc": "synthetic over-cap control: aggregate exceeds the cap \u2192 the audit must reject (the cursor's enforce path makes this unreachable on-chain; the vector pins the verdict side).",
+      "inputs": {
+        "reserved": 100,
+        "confirmed": 60,
+        "cap": 150
+      },
+      "expected": false
+    },
+    {
+      "id": "budget-headroom",
+      "step": "8312/budget-substrate",
+      "spec": "ERC-8312 \u2014 IBudgetSubstrate (bound(id)\u2192(cap,asset), spent(id), remaining(id)\u2192cap-spent)",
+      "desc": "IBudgetSubstrate: remaining MUST equal cap - spent while Active. cap=150, spent=60 \u2192 remaining=90; headroom holds. Formalizes the pre-standard StatefulBound (reserved+confirmed) / CursorHeadroom (aggregate) invariant into the spec's cap - spent = remaining semantics \u2014 same math, spec field names.",
+      "inputs": {
+        "cap": 150,
+        "spent": 60,
+        "remaining": 90
+      },
+      "expected": true
+    },
+    {
+      "id": "budget-headroom-breach",
+      "step": "8312/budget-substrate",
+      "spec": "ERC-8312 \u2014 IBudgetSubstrate (spent \u2264 cap invariant)",
+      "desc": "synthetic over-budget control: spent exceeds cap \u2192 the audit must reject. Mirrors cap-conservation-breach in the spent/cap field names.",
+      "inputs": {
+        "cap": 150,
+        "spent": 200,
+        "remaining": 0
+      },
+      "expected": false
+    },
+    {
+      "id": "budget-substrate-misreport",
+      "step": "8312/budget-substrate",
+      "spec": "ERC-8312 \u2014 IBudgetSubstrate (remaining(id) is not trusted \u2014 recomputed)",
+      "desc": "control for a lying substrate: it REPORTS remaining=100 but cap - spent = 90 \u2192 recompute rejects. remaining(id) is verified against cap - spent, never taken on trust.",
+      "inputs": {
+        "cap": 150,
+        "spent": 60,
+        "remaining": 100
+      },
+      "expected": false
+    }
+  ]
+}

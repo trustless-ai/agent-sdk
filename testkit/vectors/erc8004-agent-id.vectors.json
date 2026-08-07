@@ -1,0 +1,27 @@
+{
+  "schema": "agent-sdk.golden-vectors.v0",
+  "source": "recompute-kit/conformance/agent-flow.vectors.json",
+  "note": "Golden conformance vectors for ERC-8004-agent-id. Every language port MUST reproduce expected exactly.",
+  "vectors": [
+    {
+      "id": "8004-agent-id-wizgob",
+      "step": "8004/agent-id",
+      "spec": "ERC-8004 / ERC-8299 (PR #1810)",
+      "desc": "agentId = bytes32(uint256(registryId)); Wizgob = ERC-8004 registry id 860, left-padded",
+      "inputs": {
+        "registryId": 860
+      },
+      "expected": "0x000000000000000000000000000000000000000000000000000000000000035c"
+    },
+    {
+      "id": "8004-agent-id-ours",
+      "step": "8004/agent-id",
+      "spec": "ERC-8004 / ERC-8299 (PR #1810)",
+      "desc": "agentId = bytes32(uint256(registryId)); our dinamic.eth registry id 54848",
+      "inputs": {
+        "registryId": 54848
+      },
+      "expected": "0x000000000000000000000000000000000000000000000000000000000000d640"
+    }
+  ]
+}

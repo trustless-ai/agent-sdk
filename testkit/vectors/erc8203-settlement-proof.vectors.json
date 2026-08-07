@@ -1,0 +1,18 @@
+{
+  "schema": "agent-sdk.golden-vectors.v0",
+  "source": "recompute-kit/conformance/agent-flow.vectors.json",
+  "note": "Golden conformance vectors for ERC-8203-settlement-proof. Every language port MUST reproduce expected exactly.",
+  "vectors": [
+    {
+      "id": "settlement-proof-consult",
+      "step": "8203/settlement-proof",
+      "spec": "ERC-8203 SettlementProofRef (ConsultEscrow release commitment)",
+      "desc": "verdictHash = keccak256(abi.encode(bytes32 jobId, keccak256(utf8 resultText))) \u2014 the commitment ConsultEscrow.release() recomputes on-chain before checking the attestor sig. Real mainnet settlement (job 0xbc01b40, release 0x779204, escrow 0x7057fbA7).",
+      "inputs": {
+        "jobId": "0xbc01b40fe7a3509f35470053d4bc1844d50c9782546cf0fc11154adcb90caa56",
+        "resultText": "No intermediaries required, cryptographic verification only."
+      },
+      "expected": "0xdc568bd1cbacdd1ead8231e9d3d6f4e475f5168f3cc9f72b31935d46cfdd48f7"
+    }
+  ]
+}

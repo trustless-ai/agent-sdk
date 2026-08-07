@@ -1,0 +1,18 @@
+{
+  "schema": "agent-sdk.golden-vectors.v0",
+  "source": "recompute-kit/conformance/agent-flow.vectors.json",
+  "note": "Golden conformance vectors for ERC-8275-reputation. Every language port MUST reproduce expected exactly.",
+  "vectors": [
+    {
+      "id": "8275-reputation",
+      "step": "8275/reputation",
+      "spec": "ERC-8275 axis",
+      "desc": "the RECOMPUTABLE input: winRate = commit_gated_wins/(gated_wins+gated_losses) reproduces the ledger's published winRate (primary artifact). The composite reputation is an impl-defined VIEW, deliberately not a conformance value.",
+      "inputs": {
+        "commit_gated_wins": 16,
+        "commit_gated_losses": 15
+      },
+      "expected": 0.5161
+    }
+  ]
+}

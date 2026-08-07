@@ -1,0 +1,28 @@
+{
+  "schema": "agent-sdk.golden-vectors.v0",
+  "source": "recompute-kit/conformance/agent-flow.vectors.json",
+  "note": "Golden conformance vectors for ERC-8299-wyriwe. Every language port MUST reproduce expected exactly.",
+  "vectors": [
+    {
+      "id": "wyriwe-raw",
+      "step": "wyriwe/raw",
+      "spec": "ERC-8299 \u00a745",
+      "desc": "raw_input_hash = keccak256(raw_user_input)",
+      "inputs": {
+        "raw_input_hex": "0x68656c6c6f"
+      },
+      "expected": "0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8"
+    },
+    {
+      "id": "wyriwe-pipeline",
+      "step": "wyriwe/pipeline",
+      "spec": "ERC-8299 \u00a746",
+      "desc": "sanitization_pipeline_hash = keccak256(utf8(cid) || raw_input_hash)",
+      "inputs": {
+        "spec_cid": "ipfs://QmccvoM6aRVgZ2dtFWvT6Wm3DmTvoAUHHotK7uQufnStVR",
+        "raw_input_hash": "0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8"
+      },
+      "expected": "0x5798efed4aa92f96a0622fc30268042b067294bdb5fd06f599bf8d84fd5d734b"
+    }
+  ]
+}
