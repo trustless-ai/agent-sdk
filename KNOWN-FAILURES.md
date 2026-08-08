@@ -1,35 +1,11 @@
 # Known failures
 
-Tests that run on every CI run and currently fail. They are **executed and
-reported**, never excluded — a skipped test that nobody sees is how a suite
-drifts from green-because-correct to green-because-quiet.
+No known failures. Every suite runs green on CI.
 
-Delete an entry the moment it passes; delete the file when the list empties.
-
----
-
-## `go/test` — `TestERC8301AgentWorkflow`  ([#16](https://github.com/trustless-ai/agent-sdk/issues/16))
-
-**Status:** real finding, not a setup problem.
-
-The test gets as far as a successful run: `run()` returns a `runId`, and
-`getAgentTask` reads back `stage=1 proven=true`. It then calls `onAgentProve`
-for the **reply** and the reply does not come back proven:
-
-```
-erc8301_integration_test.go:164: reply proven = false after onAgentProve, want true
-erc8301_integration_test.go:167: reply verifier = 0x000…000, want signer 0x835f…0D3A
-erc8301_integration_test.go:170: reply verificationDigest = 0x000…000,
-                                 want keccak256(proof) 0x2adf2af3…45d68
-```
-
-Three zero values where the prove call should have written a verifier, a digest
-and the flag. The same flow works for the task earlier in the test, so this is
-specific to the reply path — either the client targets the wrong record or the
-mock does not persist reply proofs.
-
-Owner: whoever owns `go/execution/erc8301` (@JimmyShi22 wrote the Go SDK).
-Not diagnosed further here rather than guessed at.
+Entries were **executed and reported**, never excluded — a skipped test that
+nobody sees is how a suite drifts from green-because-correct to
+green-because-quiet. Delete an entry the moment it passes; delete the file when
+the list empties.
 
 ---
 

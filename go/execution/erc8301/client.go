@@ -170,24 +170,44 @@ func (c *AgentWorkflowClient) GetReply(ctx context.Context, replyHash common.Has
 }
 
 // OnAgentReply submits a reply to a dispatched task by broadcasting
-// onAgentReply(reply). reply.Replier MUST equal the signing account's
-// address; the contract anchors the reply under its derived replyHash (see
-// ComputeReplyHash). Returns ErrNoSigner if the client has no private key.
+// onAgentReply(reply) and waits for the transaction to be mined, so that a
+// subsequent GetReply sees the anchored reply. reply.Replier MUST equal the
+// signing account's address; the contract anchors the reply under its derived
+// replyHash (see ComputeReplyHash). Returns ErrNoSigner if the client has no
+// private key.
 func (c *AgentWorkflowClient) OnAgentReply(ctx context.Context, reply AgentReply) (*types.Transaction, error) {
 	if c.key == nil {
 		return nil, ErrNoSigner
 	}
-	return c.transact(ctx, "onAgentReply", reply)
+	tx, err := c.transact(ctx, "onAgentReply", reply)
+	if err != nil {
+		return nil, err
+	}
+	_, err = bind.WaitMined(ctx, c.rpc, tx)
+	if err != nil {
+		return nil, fmt.Errorf("erc8301: wait for onAgentReply to mine: %w", err)
+	}
+	return tx, nil
 }
 
 // OnAgentProve submits a cryptographic proof covering one or more anchored
-// replies by broadcasting onAgentProve(replyHashes, proof). Returns
-// ErrNoSigner if the client has no private key.
+// replies by broadcasting onAgentProve(replyHashes, proof) and waits for the
+// transaction to be mined, so that a subsequent GetReply sees the proof
+// recorded (proven=true). Returns ErrNoSigner if the client has no private
+// key.
 func (c *AgentWorkflowClient) OnAgentProve(ctx context.Context, replyHashes []common.Hash, proof []byte) (*types.Transaction, error) {
 	if c.key == nil {
 		return nil, ErrNoSigner
 	}
-	return c.transact(ctx, "onAgentProve", replyHashes, proof)
+	tx, err := c.transact(ctx, "onAgentProve", replyHashes, proof)
+	if err != nil {
+		return nil, err
+	}
+	_, err = bind.WaitMined(ctx, c.rpc, tx)
+	if err != nil {
+		return nil, fmt.Errorf("erc8301: wait for onAgentProve to mine: %w", err)
+	}
+	return tx, nil
 }
 
 // transact packs the method inputs via the ABI (a.Pack prepends the 4-byte
