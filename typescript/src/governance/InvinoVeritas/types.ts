@@ -50,6 +50,32 @@ export interface ReviewResponse {
   proof?: ReviewProof
 }
 
+/** Where the ERC-8301 `IAgentWorkflow` contract an agent's on-chain reply would be
+ * anchored to actually lives — a read-only lookup, no wallet/account needed. */
+export interface AgentWorkflowGateConfig {
+  rpcUrl: string
+  /** The deployed IAgentWorkflow contract address. */
+  address: `0x${string}`
+}
+
+/** Result of checking whether a specific reply (identified by its ERC-8301
+ * replyHash) was actually anchored on-chain — see
+ * `ReviewGateClient.confirmReplyAnchored`. */
+export type ReplyAnchorStatus =
+  | { anchored: false }
+  | {
+      anchored: true
+      /** True once a proof covering this reply has been submitted via
+       * `onAgentProve` — false means the reply is anchored but not yet proven. */
+      proven: boolean
+      /** The address that called `onAgentProve` for this reply; the zero
+       * address if not yet proven. */
+      verifier: `0x${string}`
+      /** keccak256 of the proof bytes submitted for this reply; a zero
+       * bytes32 if not yet proven. */
+      verificationDigest: `0x${string}`
+    }
+
 export interface ReviewOptions {
   /** What kind of thing `artifact` is — e.g. "shell_command", "code_diff",
    * "trade_order", "general". Free-form; the backend uses it as a hint for

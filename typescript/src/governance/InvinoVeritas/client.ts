@@ -1,5 +1,21 @@
 import { verifyProofLocal, type LocalProofResult } from 'invinoveritas-verify'
-import type { ReviewGateConfig, ReviewOptions, ReviewResponse } from './types.js'
+import {
+  BaseError,
+  ContractFunctionRevertedError,
+  createPublicClient,
+  http,
+  type Address,
+  type Hex,
+} from 'viem'
+import { foundry } from 'viem/chains'
+import { agentWorkflowAbi } from '../../execution/ERC8301/abi.js'
+import type {
+  AgentWorkflowGateConfig,
+  ReplyAnchorStatus,
+  ReviewGateConfig,
+  ReviewOptions,
+  ReviewResponse,
+} from './types.js'
 
 const DEFAULT_BASE_URL = 'https://api.babyblueviper.com'
 
@@ -77,5 +93,67 @@ export class ReviewGateClient {
       )
     }
     return verifyProofLocal(response.proof.event as unknown as Record<string, unknown>)
+  }
+
+  /**
+   * Confirm on-chain whether a review's downstream action actually reached
+   * an ERC-8301 `IAgentWorkflow` gate — closes a real gap: `review()` and
+   * `verifyLocal()` only prove what invinoveritas SAID about an action, not
+   * that the action's on-chain reply was ever anchored (an agent could
+   * silently drop it before submission, or a workflow could reject it
+   * before `onAgentReply` ever ran).
+   *
+   * Reads `getAgentReply(replyHash)` on the given workflow contract. A
+   * revert means the hash was never anchored — ERC-8301's own spec
+   * ("MUST revert if replyHash is unknown") makes this the correct signal,
+   * not an error condition, so this method returns `{ anchored: false }`
+   * for it rather than throwing. Any OTHER failure (bad RPC URL, wrong
+   * contract address, network error) is NOT caught here and propagates —
+   * conflating "confirmed not anchored" with "couldn't check" would make
+   * this method fail open on exactly the case it exists to catch.
+   *
+   * Note on naming: an earlier draft of ERC-8301 (commit `9fcb78c0c8`)
+   * apparently added a dedicated `AgentReplyAnchored` event for this; as of
+   * this writing that event is NOT present in `trustless-ai/agent-ercs`'s
+   * merged `IAgentWorkflow.sol` (confirmed directly against the interface
+   * this SDK's own `execution/ERC8301` module already binds to — replies
+   * are anchored via the existing `NewAgentTask` event with `stage=2`, not
+   * a separately-named one). `getAgentReply`'s revert-vs-return behavior
+   * answers the same question without depending on that event name.
+   *
+   * @param workflow - `{ rpcUrl, address }` for the deployed IAgentWorkflow
+   *   contract the reply would have been submitted to. Read-only — no
+   *   wallet/account needed.
+   * @param replyHash - The ERC-8301 reply hash to check
+   *   (`keccak256(abi.encode(outputHash, timestamp, replier,
+   *   keccak256(abi.encodePacked(prevTaskHashes)), workflowRunId))` — see
+   *   `computeReplyHash` in `execution/ERC8301/recompute.js` if you need to
+   *   derive it from the reply's own fields rather than a value already in
+   *   hand from the submission transaction).
+   */
+  async confirmReplyAnchored(
+    workflow: AgentWorkflowGateConfig,
+    replyHash: Hex,
+  ): Promise<ReplyAnchorStatus> {
+    const publicClient = createPublicClient({ chain: foundry, transport: http(workflow.rpcUrl) })
+
+    try {
+      const [, verifier, proven, verificationDigest] = (await publicClient.readContract({
+        address: workflow.address as Address,
+        abi: agentWorkflowAbi,
+        functionName: 'getAgentReply',
+        args: [replyHash],
+      } as never)) as [unknown, Address, boolean, Hex]
+
+      return { anchored: true, proven, verifier, verificationDigest }
+    } catch (err) {
+      const isUnknownReply =
+        err instanceof BaseError &&
+        err.walk((e) => e instanceof ContractFunctionRevertedError) !== null
+      if (isUnknownReply) {
+        return { anchored: false }
+      }
+      throw err
+    }
   }
 }
