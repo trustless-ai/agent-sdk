@@ -1,3 +1,5 @@
+import type { Address, Chain, Hex } from 'viem'
+
 /** Client config for ReviewGateClient — an HTTP endpoint, not an on-chain address. */
 export interface ReviewGateConfig {
   /** invinoveritas API key (Bearer token). Required for paid calls; a small free
@@ -56,7 +58,35 @@ export interface AgentWorkflowGateConfig {
   rpcUrl: string
   /** The deployed IAgentWorkflow contract address. */
   address: `0x${string}`
+  /**
+   * The viem chain this `rpcUrl` points at.
+   *
+   * Optional, and defaults to `foundry` so local/anvil callers need not supply it. It exists
+   * because `confirmReplyAnchored` is documented as confirming against "the deployed
+   * IAgentWorkflow contract" generally, not a local devnet — and hardwiring a chain contradicts
+   * that. The hardcoded version happened to work only because viem does not enforce chainId on a
+   * read-only `eth_call`; that is a property of the call type, not of the code being correct, so
+   * it would become a real defect the moment this grows anything write-shaped or viem tightens
+   * that path. Raised by Tiago Merlini (via Echo) in review of PR #22.
+   */
+  chain?: Chain
 }
+
+/**
+ * The exact return shape of IAgentWorkflow.getAgentReply.
+ *
+ * Named rather than inlined as a cast so that a future ABI change or a reordered destructure is
+ * caught by tsc instead of being silent at compile time and wrong at runtime. The leading slot is
+ * the reply tuple itself, which `confirmReplyAnchored` deliberately skips — that ordering is the
+ * thing a reviewer previously had to verify by hand against ground truth, and it is exactly what
+ * a type should be carrying.
+ */
+export type AgentReplyTuple = readonly [
+  reply: unknown,
+  verifier: Address,
+  proven: boolean,
+  verificationDigest: Hex,
+]
 
 /** Result of checking whether a specific reply (identified by its ERC-8301
  * replyHash) was actually anchored on-chain — see

@@ -10,6 +10,7 @@ import {
 import { foundry } from 'viem/chains'
 import { agentWorkflowAbi } from '../../execution/ERC8301/abi.js'
 import type {
+  AgentReplyTuple,
   AgentWorkflowGateConfig,
   ReplyAnchorStatus,
   ReviewGateConfig,
@@ -135,15 +136,32 @@ export class ReviewGateClient {
     workflow: AgentWorkflowGateConfig,
     replyHash: Hex,
   ): Promise<ReplyAnchorStatus> {
-    const publicClient = createPublicClient({ chain: foundry, transport: http(workflow.rpcUrl) })
+    // `workflow.chain` defaults to foundry so local/anvil callers need not supply it, but it is
+    // configurable because this method is documented as confirming against the deployed
+    // IAgentWorkflow contract generally. The previous hardcode worked only because viem does not
+    // enforce chainId on a read-only eth_call -- a property of the call type, not of the code
+    // being right. (Tiago Merlini via Echo, PR #22 review.)
+    const publicClient = createPublicClient({
+      chain: workflow.chain ?? foundry,
+      transport: http(workflow.rpcUrl),
+    })
 
     try {
-      const [, verifier, proven, verificationDigest] = (await publicClient.readContract({
+      // Typed via a narrow local alias rather than `as never` + a blanket tuple cast. The
+      // destructure order below is load-bearing -- getAgentReply returns
+      // [reply tuple, verifier, proven, verificationDigest], and the leading hole skips the
+      // reply tuple. Echo had to verify that order by hand against ground truth precisely
+      // because the old casts disabled the compile-time net; an ABI change or a reordered
+      // destructure would have been silent to tsc and wrong at runtime, which is the worst
+      // pairing. Keeping the return shape named means tsc catches that drift instead.
+      const reply = (await publicClient.readContract({
         address: workflow.address as Address,
         abi: agentWorkflowAbi,
         functionName: 'getAgentReply',
         args: [replyHash],
-      } as never)) as [unknown, Address, boolean, Hex]
+      } as Parameters<typeof publicClient.readContract>[0])) as AgentReplyTuple
+
+      const [, verifier, proven, verificationDigest] = reply
 
       return { anchored: true, proven, verifier, verificationDigest }
     } catch (err) {
