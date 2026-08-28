@@ -1,0 +1,97 @@
+{
+  "schema": "agent-sdk.golden-vectors.v1",
+  "profile": "erc8275-win-rate-bps.v0",
+  "source": "recompute-kit/conformance/erc8275-win-rate-bps-v0/erc8275-win-rate-bps-v0.vectors.json",
+  "note": "Prospective basis-points issuance vectors. Historical float-4dp vectors remain unchanged and governed by their original convention.",
+  "convention_spec": {
+    "erc": "ERC-8275",
+    "formula": "winRateBps = (gated_wins*20000 + total) // (2*total), total = wins+losses",
+    "id": "win_rate.bps.v0",
+    "quantity": "erc8275.win_rate",
+    "representation": "integer basis points, 0..10000",
+    "rounding_mode": "round-half-up (half-away-from-zero), exact integer division — never a float round()",
+    "source": "agent-sdk#5 @87b08f3 reputation/erc8275 — Python/Rust/TS identical; winRateBps live on babyblueviper /ledger"
+  },
+  "vectors": [
+    {
+      "name": "golden-16-15",
+      "id": "8275-reputation-bps-16-15",
+      "step": "8275/reputation-bps",
+      "inputs": {"commit_gated_wins": 16, "commit_gated_losses": 15},
+      "governing_convention_hash": "0x0501b75db8e9ef4ef67c74efcfbe2a200b0a7e5aea5ca62f778c91c119e68daf",
+      "expected": 5161
+    },
+    {
+      "name": "zero-wins",
+      "id": "8275-reputation-bps-zero-wins",
+      "step": "8275/reputation-bps",
+      "inputs": {"commit_gated_wins": 0, "commit_gated_losses": 15},
+      "governing_convention_hash": "0x0501b75db8e9ef4ef67c74efcfbe2a200b0a7e5aea5ca62f778c91c119e68daf",
+      "expected": 0
+    },
+    {
+      "name": "zero-losses",
+      "id": "8275-reputation-bps-zero-losses",
+      "step": "8275/reputation-bps",
+      "inputs": {"commit_gated_wins": 16, "commit_gated_losses": 0},
+      "governing_convention_hash": "0x0501b75db8e9ef4ef67c74efcfbe2a200b0a7e5aea5ca62f778c91c119e68daf",
+      "expected": 10000
+    },
+    {
+      "name": "one-third",
+      "id": "8275-reputation-bps-one-third",
+      "step": "8275/reputation-bps",
+      "inputs": {"commit_gated_wins": 1, "commit_gated_losses": 2},
+      "governing_convention_hash": "0x0501b75db8e9ef4ef67c74efcfbe2a200b0a7e5aea5ca62f778c91c119e68daf",
+      "expected": 3333
+    },
+    {
+      "name": "binary-exact-half-tie",
+      "id": "8275-reputation-bps-1-31",
+      "step": "8275/reputation-bps",
+      "inputs": {"commit_gated_wins": 1, "commit_gated_losses": 31},
+      "governing_convention_hash": "0x0501b75db8e9ef4ef67c74efcfbe2a200b0a7e5aea5ca62f778c91c119e68daf",
+      "expected": 313
+    },
+    {
+      "name": "decimal-half-tie-57-800",
+      "id": "8275-reputation-bps-57-800",
+      "step": "8275/reputation-bps",
+      "inputs": {"commit_gated_wins": 57, "commit_gated_losses": 743},
+      "governing_convention_hash": "0x0501b75db8e9ef4ef67c74efcfbe2a200b0a7e5aea5ca62f778c91c119e68daf",
+      "expected": 713
+    },
+    {
+      "name": "decimal-half-tie-69-800",
+      "id": "8275-reputation-bps-69-800",
+      "step": "8275/reputation-bps",
+      "inputs": {"commit_gated_wins": 69, "commit_gated_losses": 731},
+      "governing_convention_hash": "0x0501b75db8e9ef4ef67c74efcfbe2a200b0a7e5aea5ca62f778c91c119e68daf",
+      "expected": 863
+    },
+    {
+      "name": "decimal-half-tie-113-800",
+      "id": "8275-reputation-bps-113-800",
+      "step": "8275/reputation-bps",
+      "inputs": {"commit_gated_wins": 113, "commit_gated_losses": 687},
+      "governing_convention_hash": "0x0501b75db8e9ef4ef67c74efcfbe2a200b0a7e5aea5ca62f778c91c119e68daf",
+      "expected": 1413
+    },
+    {
+      "name": "decimal-half-tie-139-800",
+      "id": "8275-reputation-bps-139-800",
+      "step": "8275/reputation-bps",
+      "inputs": {"commit_gated_wins": 139, "commit_gated_losses": 661},
+      "governing_convention_hash": "0x0501b75db8e9ef4ef67c74efcfbe2a200b0a7e5aea5ca62f778c91c119e68daf",
+      "expected": 1738
+    },
+    {
+      "name": "decimal-half-tie-163-800",
+      "id": "8275-reputation-bps-163-800",
+      "step": "8275/reputation-bps",
+      "inputs": {"commit_gated_wins": 163, "commit_gated_losses": 637},
+      "governing_convention_hash": "0x0501b75db8e9ef4ef67c74efcfbe2a200b0a7e5aea5ca62f778c91c119e68daf",
+      "expected": 2038
+    }
+  ]
+}

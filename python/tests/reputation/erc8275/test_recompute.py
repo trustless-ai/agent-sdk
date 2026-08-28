@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from agent_sdk.reputation.erc8275.recompute import compute_win_rate
+from agent_sdk.reputation.erc8275.conventions import WIN_RATE_BPS_V0_HASH
 
 # ── Inline golden vectors (primary) ──────────────────────────────────────
 # Convention: basis points (10000 = 1.0, 5161 = 0.5161).
@@ -20,7 +21,7 @@ INLINE_VECTORS = [
 
 
 def _conformance_vectors():
-    """Read repo-local golden vectors for 8275/reputation (testkit/vectors).
+    """Read repo-local golden vectors for 8275/reputation-bps (testkit/vectors).
 
     Returns an empty list if the file is not present (the inline vectors in
     INLINE_VECTORS are the primary assertion; the file-based check is a
@@ -30,13 +31,13 @@ def _conformance_vectors():
         Path(__file__).resolve().parents[4]
         / "testkit"
         / "vectors"
-        / "erc8275-reputation.vectors.json"
+        / "erc8275-reputation-bps-v0.vectors.json"
     )
     if not vectors_path.exists():
         return []
     with open(vectors_path) as f:
         data = json.load(f)
-    return [v for v in data["vectors"] if v["step"] == "8275/reputation"]
+    return [v for v in data["vectors"] if v["step"] == "8275/reputation-bps"]
 
 
 class TestComputeWinRate:
@@ -64,9 +65,8 @@ class TestComputeWinRate:
             label = f"{vec['id']}: {vec.get('desc', vec.get('spec', '(no description)'))}"
             wins = vec["inputs"]["commit_gated_wins"]
             losses = vec["inputs"]["commit_gated_losses"]
-            # Kit vectors use float (0.5161), SDK returns basis points (5161)
-            expected_bps = int(round(vec["expected"] * 10000))
-            assert compute_win_rate(wins, losses) == expected_bps, label
+            assert vec["governing_convention_hash"] == WIN_RATE_BPS_V0_HASH, label
+            assert compute_win_rate(wins, losses) == vec["expected"], label
 
     def test_zero_wins(self):
         assert compute_win_rate(0, 15) == 0

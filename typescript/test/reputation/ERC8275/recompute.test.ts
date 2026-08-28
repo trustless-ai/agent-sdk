@@ -3,10 +3,11 @@ import { readFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { computeWinRate } from '../../../src/reputation/ERC8275/recompute.js'
+import { WIN_RATE_BPS_V0_HASH } from '../../../src/reputation/ERC8275/conventions.js'
 
 // ── Inline golden vectors (primary) ──────────────────────────────────────
-// These reproduce the vectors from testkit/vectors/erc8275-reputation.vectors.json
-// for step "8275/reputation". They are duplicated here so tests pass even
+// These reproduce the vectors from testkit/vectors/erc8275-reputation-bps-v0.vectors.json
+// for step "8275/reputation-bps". They are duplicated here so tests pass even
 // when the vectors file is not present on disk.
 
 const INLINE_VECTORS = [
@@ -27,12 +28,13 @@ interface ConformanceVector {
   desc?: string
   inputs: Record<string, unknown>
   expected: unknown
+  governing_convention_hash: string
 }
 
 function loadConformanceVectors(): ConformanceVector[] {
   const vectorsPath = path.resolve(
     fileURLToPath(new URL('.', import.meta.url)),
-    '../../../../testkit/vectors/erc8275-reputation.vectors.json',
+    '../../../../testkit/vectors/erc8275-reputation-bps-v0.vectors.json',
   )
   if (!existsSync(vectorsPath)) {
     console.warn(
@@ -42,7 +44,7 @@ function loadConformanceVectors(): ConformanceVector[] {
   }
   const raw = readFileSync(vectorsPath, 'utf-8')
   const data = JSON.parse(raw) as { vectors: ConformanceVector[] }
-  return data.vectors.filter((v) => v.step === '8275/reputation')
+  return data.vectors.filter((v) => v.step === '8275/reputation-bps')
 }
 
 describe('computeWinRate (ERC-8275 recompute)', () => {
@@ -72,8 +74,8 @@ describe('computeWinRate (ERC-8275 recompute)', () => {
         () => {
           const wins = Number(vec.inputs.commit_gated_wins)
           const losses = Number(vec.inputs.commit_gated_losses)
-          // Kit vectors use float (0.5161), SDK returns basis points (5161)
-          const expected = Math.round((vec.expected as number) * 10000)
+          expect(vec.governing_convention_hash).toBe(WIN_RATE_BPS_V0_HASH)
+          const expected = vec.expected as number
           expect(computeWinRate(wins, losses)).toBe(expected)
         },
       )

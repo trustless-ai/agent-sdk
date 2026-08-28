@@ -44,7 +44,7 @@ The output has two layers:
    - ERC-8301: `taskHash = keccak256(abi.encode(stage, taskSeq, inputHash, timestamp, expiresAt, innerHash, workflowRunId))` (`step: "8301/task-hash"`)
    - Scope-contestation: `scopeRoot = keccak256(abi.encode(merkleRoot, count))` (`step: "scope/binding"`)
    - ENS: `namehash(name)` per EIP-137 (`step: "ens/namehash"`)
-   - ERC-8275: `winRate = gated_wins / (gated_wins + gated_losses)` (`step: "8275/reputation"`)
+   - ERC-8275: `winRateBps = round_half_up(gated_wins * 10000 / (gated_wins + gated_losses))` (`step: "8275/reputation-bps"`)
    - ERC-8203: `verdictHash = keccak256(abi.encode(jobId, keccak256(utf8(resultText))))` (`step: "8203/settlement-proof"`)
    - Scope-contestation bond: "standing" computed from public bond state (`step: "scope/bond-standing"`)
    - Scope-contestation: resolution root from sorted votes (`step: "scope/value-fidelity"`)
@@ -280,12 +280,13 @@ The output has two layers:
    }
    ```
 
-   **ERC-8275 float-to-bps conversion:**
-   recompute-kit vectors use float `"expected": 0.5161`; SDK returns basis points. Reader must convert:
-   - TS: `Math.round((v.expected as number) * 10000)`
-   - Python: `round(v["expected"] * 10000)`
-   - Go: `uint64(math.Round(f * 10000))`
-   - Rust: `(v["expected"].as_f64().unwrap() * 10000.0).round() as u64`
+   **ERC-8275 basis-points convention:**
+   The prospective `erc8275-win-rate-bps.v0` vectors carry integer basis-point
+   expectations and the exact `governing_convention_hash`. Readers MUST compare
+   the integer result directly and MUST reject or mark unverifiable a missing or
+   unknown convention pointer. Do not convert the historical float vectors at
+   read time; those remain non-retroactive evidence under their original
+   convention.
 
    **List each vector step explicitly in the dispatch** — do NOT write `// similar for other steps`. Every dispatch is one case/elif/switch branch with its exact function call and type conversion.
 

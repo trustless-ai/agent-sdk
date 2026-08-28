@@ -67,10 +67,11 @@ mod tests {
 #[cfg(test)]
 mod golden_vector_tests {
     use super::*;
+    use crate::erc8275::conventions::WIN_RATE_BPS_V0_HASH;
     use serde_json::Value;
 
     const VECTORS_STR: &str =
-        include_str!("../../../../testkit/vectors/erc8275-reputation.vectors.json");
+        include_str!("../../../../testkit/vectors/erc8275-reputation-bps-v0.vectors.json");
 
     #[test]
     fn golden_vectors() {
@@ -78,11 +79,14 @@ mod golden_vector_tests {
         for v in data["vectors"].as_array().unwrap() {
             let step = v["step"].as_str().unwrap();
             match step {
-                "8275/reputation" => {
+                "8275/reputation-bps" => {
                     let wins = v["inputs"]["commit_gated_wins"].as_u64().unwrap();
                     let losses = v["inputs"]["commit_gated_losses"].as_u64().unwrap();
-                    // expected is a float rate (e.g. 0.5161) — convert to basis points
-                    let expected = (v["expected"].as_f64().unwrap() * 10000.0).round() as u64;
+                    assert_eq!(
+                        v["governing_convention_hash"].as_str().unwrap(),
+                        WIN_RATE_BPS_V0_HASH
+                    );
+                    let expected = v["expected"].as_u64().unwrap();
                     assert_eq!(compute_win_rate(wins, losses), Some(expected));
                 }
                 _ => panic!("unknown step {}", step),

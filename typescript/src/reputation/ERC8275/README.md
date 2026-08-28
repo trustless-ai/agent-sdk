@@ -24,8 +24,8 @@ All three calls are read-only; no gas or broadcast needed.
 
 One deterministic computation reproducible off-chain from public inputs:
 
-- **`computeWinRate(wins, losses)`** — `winRate = gated_wins / (gated_wins + gated_losses)`, rounded to 4 decimal places (ERC-8275). Golden vector: `wins: 16, losses: 15` —> `0.5161`.
+- **`computeWinRate(wins, losses)`** — integer basis points under `erc8275-win-rate-bps.v0`: `round_half_up(gated_wins * 10000 / (gated_wins + gated_losses))`. Golden vector: `wins: 16, losses: 15` —> `5161`.
 
-The recompute function is tested against golden conformance vectors from `recompute-kit/conformance/agent-flow.vectors.json` (step `8275/reputation`). The recompute tests are pure function calls with no RPC, no anvil, and no deployed contract.
+The recompute function is tested against the prospective `erc8275-win-rate-bps.v0` vectors vendored at `testkit/vectors/erc8275-reputation-bps-v0.vectors.json` (step `8275/reputation-bps`). Every vector pins the governing convention hash; the separate historical `erc8275-reputation.vectors.json` float artifact remains byte-identical and is not relabelled. The recompute tests are pure function calls with no RPC, no anvil, and no deployed contract.
 
 See `client.ts` for the contract wrapper, `recompute.ts` for the pure function, and `test/reputation/ERC8275/` for tests.
