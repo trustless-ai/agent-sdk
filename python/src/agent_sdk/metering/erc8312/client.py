@@ -63,7 +63,8 @@ class BoundedAgentActionClient:
 
     def set_status(self, id: bytes, new_status: int) -> None:
         """Transition the envelope's lifecycle status."""
-        self._contract.functions.setStatus(id, new_status).transact()
+        tx_hash = self._contract.functions.setStatus(id, new_status).transact()
+        self._w3.eth.wait_for_transaction_receipt(tx_hash)
 
     def get_envelope(self, id: bytes) -> dict:
         """Read the full envelope struct."""

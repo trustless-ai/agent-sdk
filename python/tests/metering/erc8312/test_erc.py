@@ -1,5 +1,7 @@
 """Integration tests for ERC-8312 metering clients."""
 
+from unittest.mock import MagicMock
+
 from eth_account import Account
 from web3 import Web3
 
@@ -11,6 +13,18 @@ from agent_sdk.metering.erc8312.client import (
 
 # A fixed future expiry timestamp for all test envelopes
 EXPIRES_AT = 2000000000
+
+
+def test_set_status_waits_for_transaction_receipt():
+    client = object.__new__(BoundedAgentActionClient)
+    client._contract = MagicMock()
+    client._w3 = MagicMock()
+    tx_hash = bytes.fromhex("12" * 32)
+    client._contract.functions.setStatus.return_value.transact.return_value = tx_hash
+
+    client.set_status(bytes.fromhex("34" * 32), 2)
+
+    client._w3.eth.wait_for_transaction_receipt.assert_called_once_with(tx_hash)
 
 
 def _make_clients(deploy_contracts, anvil_rpc_url, anvil_account):
