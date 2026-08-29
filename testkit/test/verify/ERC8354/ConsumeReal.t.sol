@@ -30,13 +30,16 @@ contract ConsumeRealTest is Test {
 
     bytes32 constant DOMAIN = bytes32(uint256(42));
     address constant EXECUTOR = address(0xE0);
+    // The allowlist circuit's identity. Deliberately NOT bytes32(0) -- that placeholder is what
+    // let HonkVerifierAdapter's programKey parameter go unchecked before the fix below.
+    bytes32 constant PROGRAM_KEY = keccak256("erc8354-allowlist-v0");
 
     function setUp() public {
         vm.warp(1_700_000_000);
         registry = new PolicyDomainRegistry();
-        adapter = new HonkVerifierAdapter(IHonkVerifier(address(new HonkVerifier())));
+        adapter = new HonkVerifierAdapter(IHonkVerifier(address(new HonkVerifier())), PROGRAM_KEY);
         guard = new ConfidentialPolicyVerdict(registry);
-        registry.registerDomain(DOMAIN, address(0xA11CE), address(adapter), bytes32(0), 1 hours);
+        registry.registerDomain(DOMAIN, address(0xA11CE), address(adapter), PROGRAM_KEY, 1 hours);
         registry.updateRoot(DOMAIN, POLICY_ROOT);
     }
 

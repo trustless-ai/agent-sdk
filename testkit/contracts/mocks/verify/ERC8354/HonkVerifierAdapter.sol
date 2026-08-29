@@ -20,17 +20,35 @@ interface IHonkVerifier {
 /// at the boundary without the proof having established it. `expiry` is NOT a circuit input — the
 /// Guard enforces it on-chain. All three circuits (allowlist ALLOW, denylist, allowlist
 /// non-membership) share this layout; only the constant each asserts for `policyKind` differs.
+///
+/// SECURITY (2026-08-29, real gap found and reproduced independently -- see
+/// test/verify/ERC8354/ConsumeRealRepro.t.sol): `expiry` is not a circuit public input at all
+/// (the Guard's on-chain freshness check confirms a *caller-supplied* expiry hasn't lapsed, but
+/// never proves the circuit authorized THAT specific expiry -- the same fixture proof verifies
+/// under any expiry value). Closing this requires the upstream Noir circuit
+/// (zexoverz/confidential-agent-policy-verdicts, see PROVENANCE.md) to add expiry as a public
+/// input, regenerate the verifying key, and reissue this adapter's vendored verifier + fixture --
+/// none of which is buildable inside this repo alone. Flagged upstream; not fixed here.
 contract HonkVerifierAdapter is IVerifier {
     IHonkVerifier public immutable honk;
 
-    constructor(IHonkVerifier _honk) {
+    /// @notice The program key this specific adapter instance was deployed for. A domain's
+    /// registered `programKey` (PolicyDomainRegistry.Domain.programKey) must match this value for
+    /// a proof to verify -- otherwise a domain that rotates its program (registry.updateProgram)
+    /// keeps silently accepting proofs meant for the OLD program, since `honk` is immutable and was
+    /// never checked against what the caller actually asked to verify against. Rotating for real
+    /// means deploying a fresh adapter for the new program and pointing the domain at it.
+    bytes32 public immutable expectedProgramKey;
+
+    constructor(IHonkVerifier _honk, bytes32 _expectedProgramKey) {
         honk = _honk;
+        expectedProgramKey = _expectedProgramKey;
     }
 
+    /// @param programKey the domain's currently-registered program key (PolicyDomainRegistry).
     /// @param publicInputs abi.encode(Verdict) as passed by the Guard.
     function verifyProof(
-        bytes32,
-        /* programKey */
+        bytes32 programKey,
         bytes calldata publicInputs,
         bytes calldata proof
     )
@@ -38,6 +56,10 @@ contract HonkVerifierAdapter is IVerifier {
         view
         returns (bool)
     {
+        // Mirrors the Guard's own "malformed proof returns false, never reverts" contract --
+        // a domain pointed at the wrong adapter is the same class of caller error as a
+        // malformed proof, not a distinct revert path.
+        if (programKey != expectedProgramKey) return false;
         Verdict memory v = abi.decode(publicInputs, (Verdict));
         return honk.verify(proof, _toPublicInputs(v));
     }

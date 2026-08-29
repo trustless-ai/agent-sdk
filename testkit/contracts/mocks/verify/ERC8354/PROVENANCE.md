@@ -1,8 +1,11 @@
 # Provenance: vendored ERC-8354 verifier and fixture proof
 
-Four files in this directory are vendored, not written here. They are copied
+Three files in this directory are vendored, not written here. They are copied
 byte for byte, with no edits at all, so the claim is checkable by hash rather
-than taken on trust.
+than taken on trust. `HonkVerifierAdapter.sol` was originally a fourth, but
+diverged from upstream 2026-08-29 for a real security fix -- see
+"HonkVerifierAdapter.sol divergence" below, not still byte-identical, and no
+longer in the table this script checks.
 
 ## Source
 
@@ -26,9 +29,36 @@ relative to the root of the source repo above.
 | File | Upstream path | sha256 |
 |------|---------------|--------|
 | `HonkVerifier.sol` | `src/verifier/HonkVerifier.sol` | `04895a6bc51477739fbbb9801aee23e239aa885ed1048e75af9da76feabf8406` |
-| `HonkVerifierAdapter.sol` | `src/HonkVerifierAdapter.sol` | `085439d42da1087f397e5a2067788afd90735f6d7e2c6548fe54e7c52540feb4` |
 | `fixtures/allowlist.proof` | `test/fixtures/allowlist.proof` | `2f24e925c8aff9c7c30625f1a13b6c6834de5e88ce807c7af8ad04cec9ae4dce` |
 | `fixtures/allowlist.public_inputs` | `test/fixtures/allowlist.public_inputs` | `0dd630c7c529613882e19f22e88b28b1e838baf018a96a2c21f664f4ae5f0b75` |
+
+## HonkVerifierAdapter.sol divergence (2026-08-29)
+
+Jimmy Shi found, and this repo independently reproduced with the real fixture proof
+(`test/verify/ERC8354/ConsumeRealRepro.t.sol`, no mocks), that `HonkVerifierAdapter.sol`'s
+`verifyProof` took a `programKey` parameter and silently discarded it -- a domain rotating
+`PolicyDomainRegistry.updateProgram` to a different program kept accepting proofs meant for the
+old one, because nothing ever checked the parameter against what the adapter was actually
+deployed for.
+
+This is fixable without touching the circuit (unlike the `expiry` gap in the same PR review,
+which genuinely isn't -- see `HonkVerifierAdapter.sol`'s own doc comment): the adapter now takes
+an `expectedProgramKey` at construction and rejects any call whose `programKey` argument doesn't
+match. Real cryptographic verification, malformed-proof-returns-false, and every other property of
+the vendored `HonkVerifier.sol`/fixture pair are unaffected -- this is Solidity-level glue around
+them, not a circuit change.
+
+**Sha256 of the pre-fix file, for anyone diffing against the original vendor commit above:**
+`085439d42da1087f397e5a2067788afd90735f6d7e2c6548fe54e7c52540feb4` (was `src/HonkVerifierAdapter.sol`
+at the pinned commit). The post-fix file's own hash is whatever `sha256sum` reports on the current
+tree -- deliberately not pinned here, since this file is no longer meant to be byte-identical to
+anything.
+
+Same bug likely exists in the upstream reference implementation this was vendored from
+(zexoverz/confidential-agent-policy-verdicts) -- worth reporting there too, since any other
+adopter vendoring the same `src/HonkVerifierAdapter.sol` inherits the identical gap. Not filed
+from this repo as of this commit; flagging the omission honestly rather than silently leaving it
+implied.
 
 ## Verify
 
