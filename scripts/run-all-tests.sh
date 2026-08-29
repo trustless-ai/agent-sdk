@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Run every suite in this repo: TypeScript, Python, Go, Rust.
+# Run every suite in this repo: Foundry, TypeScript, Python, Go, Rust, plus the
+# provenance check on the vendored ERC-8354 verifier.
 #
 # CI calls this, and so can you:
 #
@@ -35,10 +36,25 @@ if [ ! -d agent-ercs/contracts ]; then
   exit 1
 fi
 
+# The vendored ERC-8354 verifier and fixture proof are what makes
+# ConsumeReal.t.sol a real cryptographic check rather than a shaped one, so the
+# hashes PROVENANCE.md pins have to hold before any of that is worth running.
+# Offline on purpose: --upstream refetches the pinned source, which would make a
+# green build depend on raw.githubusercontent.com being up.
+note "provenance (vendored ERC-8354 verifier)"
+./scripts/check-provenance.sh || FAILED="$FAILED provenance"
+
 note "forge deps"
 (cd testkit && [ -d lib/forge-std ] || forge install foundry-rs/forge-std --no-git >/dev/null 2>&1)
 (cd testkit && [ -d lib/openzeppelin-contracts ] || forge install OpenZeppelin/openzeppelin-contracts --no-git >/dev/null 2>&1)
 (cd testkit && forge build >/dev/null 2>&1) || { echo "ERROR: testkit failed to compile" >&2; exit 1; }
+
+# The Solidity suite gates too. Until this was added the script only ever built
+# the testkit, so the Foundry tests were compiled on every CI run and executed
+# on none of them -- a contract could go red and CI would still be green.
+# It needs no anvil, so it runs here, before the slower suites.
+note "Foundry (testkit)"
+(cd testkit && forge test) || FAILED="$FAILED foundry"
 
 # TypeScript FIRST, and this ordering is load-bearing.
 #
@@ -86,6 +102,14 @@ note "Go (package suites)"
 note "Rust"
 (cd rust && cargo test --lib && cargo test --tests -- --test-threads=1) || FAILED="$FAILED rust"
 
+# The go/test package is excluded from the gate above, so without this its
+# passing tests are only ever run inside the known-failing block below, where
+# ANY failure is attributed to ERC-8301 and never reaches FAILED. An ERC-8354
+# regression would then still end in "All five suites passed". Gate the suites
+# we do expect to pass by name, leaving the ERC-8301 quarantine untouched.
+note "Go (go/test, gating suites)"
+(cd go && go test -count=1 ./test/... -run '^TestERC8354') || FAILED="$FAILED go-erc8354-integration"
+
 # ── Known-failing: run and REPORTED, never hidden ──────────────────────────
 # One test, and it is a real finding rather than a setup problem -- see
 # KNOWN-FAILURES.md. It runs on every CI run so it cannot quietly become two.
@@ -106,4 +130,4 @@ if [ -n "$FAILED" ]; then
   echo "FAILED:$FAILED"
   exit 1
 fi
-echo "All four suites passed."
+echo "All five suites passed."

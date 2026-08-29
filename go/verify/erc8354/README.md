@@ -11,16 +11,11 @@ that is never disclosed on-chain.
   - `computeVerdictDigest` reproduces the EIP-712 digest an executor signs to authorize a relayer.
 - **NO** for the policy ruleset itself. The policy is never disclosed, and by design a `Verdict` is an integrity property only. It proves the committed interpreter evaluated the action and returned ALLOW, not that the policy is fair or correct.
 
-Test coverage caveat: the Foundry suite exercises `verify` and its negative
-paths (invalid proof, verifier revert, denied decision, and so on) against
-`MockVerifier`, which returns a settable boolean rather than checking a real
-proof. No real ERC-8354 verifier contract is vendored in this repo or in the
-`agent-ercs` submodule. The reference Noir circuit and UltraHonk verifier
-live in the external `zexoverz/confidential-agent-policy-verdicts` repo,
-which is not pulled into this codebase. So `verify`'s ZK soundness is
-correct by construction (a real deployed verifier is called through the
-same interface), but it is not exercised end to end against a genuine proof
-by this test suite.
+A `verify` result of `true` from `MockVerifier` means the Guard delegated to
+`IVerifier` correctly, not that a proof cryptographically checked out.
+`testkit/test/verify/ERC8354/ConsumeReal.t.sol` covers the latter: it runs
+`verify` and `consume` against the real UltraHonk verifier with a genuine
+proof, and asserts a tampered proof fails.
 
 ## Layer 1 — contract clients
 

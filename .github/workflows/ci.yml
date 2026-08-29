@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: all suites (TypeScript, Python, Go, Rust)
+    name: all suites (Foundry, TypeScript, Python, Go, Rust)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

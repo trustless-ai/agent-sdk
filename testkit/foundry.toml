@@ -4,9 +4,17 @@ script = "script"
 test = "test"
 out = "out"
 libs = ["lib"]
-solc = "0.8.25"
+# No single pinned solc: most contracts here pin 0.8.25 exactly, while the
+# vendored ERC-8354 UltraHonk verifier declares ^0.8.27. Foundry resolves a
+# version per compilation unit instead.
+auto_detect_solc = true
+# The vendored UltraHonk verifier does not fit the stack without the optimizer.
+# Same settings the reference implementation compiles it with.
+optimizer = true
+optimizer_runs = 200
 evm_version = "cancun"
 allow_paths = ["../agent-ercs"]
+fs_permissions = [{ access = "read", path = "./contracts/mocks/verify/ERC8354/fixtures" }]
 
 remappings = [
     "@agent-ercs/=../agent-ercs/contracts/",
