@@ -88,11 +88,18 @@ export ANVIL_KEY
 set -a; . "$ENV_FILE"; set +a
 echo "   $(grep -c '^export' "$ENV_FILE") address exports + ANVIL_KEY"
 
-# Package suites gate. The go/test integration package is tracked separately
-# below because it currently fails on an address-convention mismatch, not on
-# the code under test.
-note "Go (package suites)"
-(cd go && go list ./... | grep -v "/go/test$" | xargs go test -count=1) || FAILED="$FAILED go"
+# Package suites gate. go/test (the integration package) used to be split out
+# into a separate "known-failing, not gating" block below, tracking a single
+# real finding (TestERC8301AgentWorkflow) that was reported on every run but
+# never allowed to fail the build. That finding is fixed -- KNOWN-FAILURES.md
+# has said "no known failures" since, and running the full package here
+# confirms it: go/test passes cleanly like every other package. The old split
+# meant an ERC-8354 (or any other) regression inside go/test's non-ERC-8354
+# tests would only ever surface inside the known-failing block, where it read
+# as "still failing on the known issue" instead of failing the build --
+# genuinely gate the whole package now that there is nothing left to quarantine.
+note "Go (all packages, including go/test)"
+(cd go && go test -count=1 ./...) || FAILED="$FAILED go"
 
 # --test-threads=1 is REQUIRED for the integration tests. They all send
 # transactions from the same anvil account, and cargo runs test binaries in
@@ -101,27 +108,6 @@ note "Go (package suites)"
 # failure was never in the code under test.
 note "Rust"
 (cd rust && cargo test --lib && cargo test --tests -- --test-threads=1) || FAILED="$FAILED rust"
-
-# The go/test package is excluded from the gate above, so without this its
-# passing tests are only ever run inside the known-failing block below, where
-# ANY failure is attributed to ERC-8301 and never reaches FAILED. An ERC-8354
-# regression would then still end in "All five suites passed". Gate the suites
-# we do expect to pass by name, leaving the ERC-8301 quarantine untouched.
-note "Go (go/test, gating suites)"
-(cd go && go test -count=1 ./test/... -run '^TestERC8354') || FAILED="$FAILED go-erc8354-integration"
-
-# ── Known-failing: run and REPORTED, never hidden ──────────────────────────
-# One test, and it is a real finding rather than a setup problem -- see
-# KNOWN-FAILURES.md. It runs on every CI run so it cannot quietly become two.
-note "known-failing (reported, not gating)"
-KNOWN=""
-(cd go && go test -count=1 ./test/... >/dev/null 2>&1) || KNOWN="$KNOWN go/test:TestERC8301AgentWorkflow"
-if [ -n "$KNOWN" ]; then
-  echo "   STILL FAILING:$KNOWN"
-  echo "   see KNOWN-FAILURES.md"
-else
-  echo "   none -- the known-failing set is empty; delete this block and the doc"
-fi
 
 # ── Verdict ────────────────────────────────────────────────────────────────
 echo ""
