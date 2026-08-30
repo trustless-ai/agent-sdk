@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {IVerifier} from "./IVerifier.sol";
 import {Verdict} from "./IConfidentialPolicyVerdict.sol";
+import {HonkVerifier, VK_HASH} from "./HonkVerifier.sol";
 
 /// @notice Minimal view of the bb-generated UltraHonk verifier.
 interface IHonkVerifier {
@@ -32,17 +33,25 @@ interface IHonkVerifier {
 contract HonkVerifierAdapter is IVerifier {
     IHonkVerifier public immutable honk;
 
-    /// @notice The program key this specific adapter instance was deployed for. A domain's
-    /// registered `programKey` (PolicyDomainRegistry.Domain.programKey) must match this value for
-    /// a proof to verify -- otherwise a domain that rotates its program (registry.updateProgram)
-    /// keeps silently accepting proofs meant for the OLD program, since `honk` is immutable and was
-    /// never checked against what the caller actually asked to verify against. Rotating for real
-    /// means deploying a fresh adapter for the new program and pointing the domain at it.
+    /// @notice The program key this specific adapter instance is bound to. Derived from the
+    /// vendored circuit's own `VK_HASH` constant (HonkVerifier.sol), not an independent
+    /// constructor-supplied label -- so the key is cryptographically tied to which verifying key
+    /// this adapter actually wraps, and cannot be set to a value disconnected from the real
+    /// verifier. `honk` is constructed INSIDE this constructor (not injected) for the same reason:
+    /// the only way to change which verifier an adapter uses is to deploy a new adapter, which by
+    /// construction also gets that new verifier's own `VK_HASH`-derived key -- the two can never
+    /// drift apart. A domain's registered `programKey` (PolicyDomainRegistry.Domain.programKey)
+    /// must match this value for a proof to verify. Real program rotation (deploying a new circuit
+    /// and pointing a domain at it) means deploying a fresh adapter and calling
+    /// `PolicyDomainRegistry.rotateVerifier` to atomically update BOTH the domain's `verifier`
+    /// address and `programKey` together -- updating only `programKey` (the older
+    /// `updateProgram`) leaves the domain pointed at an adapter whose own key no longer matches,
+    /// which is intentionally fail-closed rather than a rotation mechanism.
     bytes32 public immutable expectedProgramKey;
 
-    constructor(IHonkVerifier _honk, bytes32 _expectedProgramKey) {
-        honk = _honk;
-        expectedProgramKey = _expectedProgramKey;
+    constructor() {
+        honk = IHonkVerifier(address(new HonkVerifier()));
+        expectedProgramKey = bytes32(VK_HASH);
     }
 
     /// @param programKey the domain's currently-registered program key (PolicyDomainRegistry).

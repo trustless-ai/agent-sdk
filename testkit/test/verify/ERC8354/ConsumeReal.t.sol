@@ -5,8 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {ConfidentialPolicyVerdict} from "../../../contracts/mocks/verify/ERC8354/ConfidentialPolicyVerdict.sol";
 import {PolicyDomainRegistry} from "../../../contracts/mocks/verify/ERC8354/PolicyDomainRegistry.sol";
 import {Verdict, PolicyKind} from "../../../contracts/mocks/verify/ERC8354/IConfidentialPolicyVerdict.sol";
-import {HonkVerifier} from "../../../contracts/mocks/verify/ERC8354/HonkVerifier.sol";
-import {HonkVerifierAdapter, IHonkVerifier} from "../../../contracts/mocks/verify/ERC8354/HonkVerifierAdapter.sol";
+import {HonkVerifierAdapter} from "../../../contracts/mocks/verify/ERC8354/HonkVerifierAdapter.sol";
 
 /// @notice The no-mock counterpart to ConfidentialPolicyVerdict.t.sol. Every other test in this
 /// directory drives the verifier boundary with MockVerifier's settable boolean, which proves the
@@ -30,16 +29,16 @@ contract ConsumeRealTest is Test {
 
     bytes32 constant DOMAIN = bytes32(uint256(42));
     address constant EXECUTOR = address(0xE0);
-    // The allowlist circuit's identity. Deliberately NOT bytes32(0) -- that placeholder is what
-    // let HonkVerifierAdapter's programKey parameter go unchecked before the fix below.
-    bytes32 constant PROGRAM_KEY = keccak256("erc8354-allowlist-v0");
 
     function setUp() public {
         vm.warp(1_700_000_000);
         registry = new PolicyDomainRegistry();
-        adapter = new HonkVerifierAdapter(IHonkVerifier(address(new HonkVerifier())), PROGRAM_KEY);
+        // No arguments: the adapter constructs its own HonkVerifier and derives its programKey
+        // from that verifier's own VK_HASH -- there is no handwritten key to duplicate here, the
+        // registry setup reads it straight off the deployed adapter (adapter.expectedProgramKey()).
+        adapter = new HonkVerifierAdapter();
         guard = new ConfidentialPolicyVerdict(registry);
-        registry.registerDomain(DOMAIN, address(0xA11CE), address(adapter), PROGRAM_KEY, 1 hours);
+        registry.registerDomain(DOMAIN, address(0xA11CE), address(adapter), adapter.expectedProgramKey(), 1 hours);
         registry.updateRoot(DOMAIN, POLICY_ROOT);
     }
 

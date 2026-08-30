@@ -80,10 +80,27 @@ contract PolicyDomainRegistry is IPolicyDomainRegistry {
         emit DomainRootUpdated(domainId, newRoot, version, uint64(block.timestamp));
     }
 
+    /// @notice Program-key-only update, intentionally NOT a rotation mechanism. `verifier` is
+    /// left unchanged, so if `newProgramKey` doesn't match the currently-registered verifier's own
+    /// expected key, the domain fails closed (every future verify/consume call rejects) until an
+    /// admin either reverts the key or calls `rotateVerifier` with a verifier that does match.
+    /// Kept as its own function for the deliberately-fail-closed use case; use `rotateVerifier` to
+    /// actually move a domain to a new verifier + key together.
     function updateProgram(bytes32 domainId, bytes32 newProgramKey) external onlyAdmin(domainId) {
         bytes32 old = _domains[domainId].programKey;
         _domains[domainId].programKey = newProgramKey;
         emit DomainProgramUpdated(domainId, old, newProgramKey);
+    }
+
+    /// @notice Genuine rotation: updates `verifier` and `programKey` together, atomically, so the
+    /// domain moves to a new verifier that is actually expected to accept `newProgramKey` -- unlike
+    /// `updateProgram` alone, this does not require a window where the domain is unverifiable.
+    function rotateVerifier(bytes32 domainId, address newVerifier, bytes32 newProgramKey) external onlyAdmin(domainId) {
+        address oldVerifier = _domains[domainId].verifier;
+        bytes32 oldProgramKey = _domains[domainId].programKey;
+        _domains[domainId].verifier = newVerifier;
+        _domains[domainId].programKey = newProgramKey;
+        emit DomainVerifierRotated(domainId, oldVerifier, newVerifier, oldProgramKey, newProgramKey);
     }
 
     function revokeDomain(bytes32 domainId) external onlyAdmin(domainId) {

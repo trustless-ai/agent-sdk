@@ -42,11 +42,13 @@ old one, because nothing ever checked the parameter against what the adapter was
 deployed for.
 
 This is fixable without touching the circuit (unlike the `expiry` gap in the same PR review,
-which genuinely isn't -- see `HonkVerifierAdapter.sol`'s own doc comment): the adapter now takes
-an `expectedProgramKey` at construction and rejects any call whose `programKey` argument doesn't
-match. Real cryptographic verification, malformed-proof-returns-false, and every other property of
-the vendored `HonkVerifier.sol`/fixture pair are unaffected -- this is Solidity-level glue around
-them, not a circuit change.
+which genuinely isn't -- see `HonkVerifierAdapter.sol`'s own doc comment): the adapter now derives
+`expectedProgramKey` from the vendored `HonkVerifier.sol`'s own `VK_HASH` constant (not an
+independent constructor-supplied label, per a further review round -- see 2026-08-30 hardening
+below) and rejects any call whose `programKey` argument doesn't match. Real cryptographic
+verification, malformed-proof-returns-false, and every other property of the vendored
+`HonkVerifier.sol`/fixture pair are unaffected -- this is Solidity-level glue around them, not a
+circuit change.
 
 **Sha256 of the pre-fix file, for anyone diffing against the original vendor commit above:**
 `085439d42da1087f397e5a2067788afd90735f6d7e2c6548fe54e7c52540feb4` (was `src/HonkVerifierAdapter.sol`
@@ -55,10 +57,29 @@ tree -- deliberately not pinned here, since this file is no longer meant to be b
 anything.
 
 Same bug likely exists in the upstream reference implementation this was vendored from
-(zexoverz/confidential-agent-policy-verdicts) -- worth reporting there too, since any other
-adopter vendoring the same `src/HonkVerifierAdapter.sol` inherits the identical gap. Not filed
-from this repo as of this commit; flagging the omission honestly rather than silently leaving it
-implied.
+(zexoverz/confidential-agent-policy-verdicts) -- **filed as zexoverz/confidential-agent-policy-verdicts#3**,
+so any other adopter vendoring the same `src/HonkVerifierAdapter.sol` has a tracked issue to find
+rather than rediscovering the gap independently.
+
+### 2026-08-30 hardening (Jimmy Shi's PR #26 review, 5-point follow-up)
+
+The original fix (above) let the deployer supply an arbitrary `_expectedProgramKey` at
+construction -- correct in that it was CHECKED, but the key itself was still an independent label
+disconnected from which verifier the adapter actually wrapped. Hardened further:
+- `expectedProgramKey` is now `bytes32(VK_HASH)`, read directly from the vendored circuit's own
+  constant, not a constructor parameter at all.
+- `honk` (the `HonkVerifier` instance) is now constructed INSIDE the adapter's own constructor
+  (`new HonkVerifier()`), not injected -- the only way to get a different verifier is to deploy a
+  new adapter, and that new adapter automatically gets that verifier's own `VK_HASH`-derived key.
+  The two can no longer drift apart by construction.
+- `PolicyDomainRegistry` gained `rotateVerifier(domainId, newVerifier, newProgramKey)`, which
+  atomically updates both fields together -- a genuine rotation mechanism, distinct from the
+  existing `updateProgram` (programKey-only, intentionally fail-closed if used alone).
+- Regression coverage now includes a direct-adapter-call test (varies only `programKey`, the real
+  Verdict/proof held unchanged) proving the check is load-bearing at the adapter's own boundary,
+  plus a rotation-acceptance test (`test_FIXED_RotationToNewVerifierAndKeyAccepted`) proving
+  rotation is usable, not only fail-closed. Both independently reproduced by temporarily removing
+  the fix and confirming the tests genuinely go red before restoring it.
 
 ## Verify
 

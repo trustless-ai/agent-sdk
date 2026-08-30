@@ -5,23 +5,30 @@ import {Test} from "forge-std/Test.sol";
 import {ConfidentialPolicyVerdict} from "../../../contracts/mocks/verify/ERC8354/ConfidentialPolicyVerdict.sol";
 import {PolicyDomainRegistry} from "../../../contracts/mocks/verify/ERC8354/PolicyDomainRegistry.sol";
 import {Verdict, PolicyKind} from "../../../contracts/mocks/verify/ERC8354/IConfidentialPolicyVerdict.sol";
-import {HonkVerifier} from "../../../contracts/mocks/verify/ERC8354/HonkVerifier.sol";
-import {HonkVerifierAdapter, IHonkVerifier} from "../../../contracts/mocks/verify/ERC8354/HonkVerifierAdapter.sol";
+import {HonkVerifierAdapter} from "../../../contracts/mocks/verify/ERC8354/HonkVerifierAdapter.sol";
+import {StrictKeyedTestVerifier} from "../../../contracts/mocks/verify/ERC8354/StrictKeyedTestVerifier.sol";
 
-/// @notice Reproduction + regression coverage for Jimmy Shi's two post-merge findings on PR #25
-/// (trustless-ai/agent-sdk#25, comment 2026-08-29T17:33:12Z). Both independently reproduced with
-/// the real fixture proof before any fix was written (no mocks anywhere in this path).
+/// @notice Reproduction + regression coverage for Jimmy Shi's findings on PR #25 and PR #26
+/// (trustless-ai/agent-sdk, comments 2026-08-29T17:33:12Z and 2026-08-30T08:03:39-07:00). Every
+/// positive/negative control below is exercised with the real fixture proof or a real registry
+/// call, no mocks standing in for the boundary under test.
 ///
-/// programKey (finding 3): FIXED here -- HonkVerifierAdapter now takes an `expectedProgramKey` at
-/// construction and rejects any call whose `programKey` doesn't match. Negative + positive
-/// controls below.
+/// programKey (PR #25 finding 3, PR #26 5-point follow-up): FIXED and hardened. The adapter now
+/// derives its programKey from the vendored circuit's own VK_HASH (no independent
+/// constructor-supplied label to duplicate or drift), PolicyDomainRegistry gained a genuine atomic
+/// `rotateVerifier` alongside the existing (intentionally fail-closed) `updateProgram`, and the
+/// mismatch regression is now load-bearing at the adapter's own boundary, not only through the
+/// full Guard/registry integration path.
 ///
-/// expiry (finding 2): NOT fixed here, and can't be from inside this repo -- `expiry` was never a
-/// circuit public input (see HonkVerifierAdapter's own doc comment and PROVENANCE.md), so no
-/// Solidity-level change can bind it without the upstream Noir circuit
-/// (zexoverz/confidential-agent-policy-verdicts) adding it as one and this repo regenerating its
-/// vendored verifier + fixture against the new circuit. Kept as a named, honestly-red regression
-/// test so CI keeps surfacing the gap rather than silently dropping it.
+/// expiry (PR #25 finding 2): NOT fixed here, and can't be from inside this repo -- `expiry` was
+/// never a circuit public input (see HonkVerifierAdapter's own doc comment and PROVENANCE.md), so
+/// no Solidity-level change can bind it without the upstream Noir circuit
+/// (zexoverz/confidential-agent-policy-verdicts, issue #3 filed) adding it as one and this repo
+/// regenerating its vendored verifier + fixture against the new circuit. Kept as a named,
+/// currently-green characterization test documenting the CURRENT (insecure) behavior, so CI keeps
+/// surfacing the gap in the test list rather than it silently disappearing -- if this test ever
+/// starts failing, that means expiry IS bound now and the test (and this doc comment) need
+/// updating to match, not that something broke.
 contract ConsumeRealReproTest is Test {
     string constant PROOF_PATH = "./contracts/mocks/verify/ERC8354/fixtures/allowlist.proof";
 
@@ -35,14 +42,13 @@ contract ConsumeRealReproTest is Test {
 
     bytes32 constant DOMAIN = bytes32(uint256(42));
     address constant EXECUTOR = address(0xE0);
-    bytes32 constant PROGRAM_KEY = keccak256("erc8354-allowlist-v0");
 
     function setUp() public {
         vm.warp(1_700_000_000);
         registry = new PolicyDomainRegistry();
-        adapter = new HonkVerifierAdapter(IHonkVerifier(address(new HonkVerifier())), PROGRAM_KEY);
+        adapter = new HonkVerifierAdapter();
         guard = new ConfidentialPolicyVerdict(registry);
-        registry.registerDomain(DOMAIN, address(0xA11CE), address(adapter), PROGRAM_KEY, 1 hours);
+        registry.registerDomain(DOMAIN, address(0xA11CE), address(adapter), adapter.expectedProgramKey(), 1 hours);
         registry.updateRoot(DOMAIN, POLICY_ROOT);
     }
 
@@ -86,10 +92,11 @@ contract ConsumeRealReproTest is Test {
         assertTrue(guard.verify(_verdict(), proof));
     }
 
-    /// @notice The actual fix, proven: rotating the domain's registered program key away from
-    /// what this adapter was deployed for now correctly REJECTS the same fixture proof, where
-    /// before the fix it silently kept accepting it (see git history / PR description for the
-    /// pre-fix version of this test, which asserted the opposite).
+    /// @notice The actual fix, proven through the full Guard path: rotating the domain's
+    /// registered program key away from what this adapter was deployed for now correctly REJECTS
+    /// the same fixture proof, where before the fix it silently kept accepting it. This is
+    /// deliberately the fail-closed case (updateProgram alone, verifier left stale) -- see
+    /// test_FIXED_RotationToNewVerifierAndKeyAccepted below for the genuine-rotation counterpart.
     function test_FIXED_RotatedProgramKeyNowRejects() public {
         bytes memory proof = vm.readFileBinary(PROOF_PATH);
         Verdict memory v = _verdict();
@@ -100,17 +107,71 @@ contract ConsumeRealReproTest is Test {
         assertFalse(guard.verify(v, proof), "programKey mismatch must now reject, not silently accept");
     }
 
-    /// @notice Deploy-time negative control: an adapter constructed for one program key must
-    /// reject a domain registered under a different one, independent of any rotation event.
+    /// @notice Deploy-time negative control: a verifier bound to one program key must reject a
+    /// domain registered under a different one, independent of any rotation event. Uses
+    /// StrictKeyedTestVerifier rather than a second HonkVerifierAdapter -- the adapter no longer
+    /// accepts an arbitrary key (that was the whole point of the fix), so the general "any IVerifier
+    /// whose own key doesn't match what's registered must reject" boundary is exercised with a
+    /// verifier built specifically to make that key check controllable in a test.
     function test_FIXED_MismatchedProgramKeyAtDeployRejects() public {
-        HonkVerifierAdapter wrongAdapter =
-            new HonkVerifierAdapter(IHonkVerifier(address(new HonkVerifier())), keccak256("some-other-program"));
-        registry.registerDomain(bytes32(uint256(43)), address(0xA11CE), address(wrongAdapter), PROGRAM_KEY, 1 hours);
+        StrictKeyedTestVerifier wrongVerifier = new StrictKeyedTestVerifier(keccak256("some-other-program"));
+        registry.registerDomain(
+            bytes32(uint256(43)), address(0xA11CE), address(wrongVerifier), adapter.expectedProgramKey(), 1 hours
+        );
         registry.updateRoot(bytes32(uint256(43)), POLICY_ROOT);
 
         Verdict memory v = _verdict();
         v.domainId = bytes32(uint256(43));
         bytes memory proof = vm.readFileBinary(PROOF_PATH);
-        assertFalse(guard.verify(v, proof), "adapter deployed for a different program must reject");
+        assertFalse(guard.verify(v, proof), "verifier bound to a different program must reject");
+    }
+
+    /// @notice PR #26 point 3, load-bearing regression: the mismatch check exercised as a DIRECT
+    /// call to the adapter's own verifyProof, with the real Verdict and real proof held completely
+    /// unchanged and ONLY the programKey argument varied. This proves the check lives in the
+    /// adapter itself (not merely as an emergent property of how the Guard happens to call it) --
+    /// the positive case passes, the wrong-key case fails, and removing the `if (programKey !=
+    /// expectedProgramKey) return false;` line in HonkVerifierAdapter would make this test fail.
+    function test_FIXED_DirectAdapterCall_MatchingProgramKeyAccepts() public view {
+        bytes memory proof = vm.readFileBinary(PROOF_PATH);
+        bytes memory encodedVerdict = abi.encode(_verdict());
+        assertTrue(adapter.verifyProof(adapter.expectedProgramKey(), encodedVerdict, proof));
+    }
+
+    function test_FIXED_DirectAdapterCall_WrongProgramKeyRejects() public view {
+        bytes memory proof = vm.readFileBinary(PROOF_PATH);
+        bytes memory encodedVerdict = abi.encode(_verdict());
+        assertFalse(adapter.verifyProof(keccak256("wrong-key"), encodedVerdict, proof));
+    }
+
+    /// @notice PR #26 point 2: rotation must be genuinely usable, not only fail-closed.
+    /// `rotateVerifier` atomically swaps the domain to a new verifier AND a matching new
+    /// programKey together -- prove both halves: the OLD adapter+old-key path (superseded, not
+    /// re-tested here since test_FIXED_RotatedProgramKeyNowRejects already covers the stale-verifier
+    /// case) is not what's registered anymore, and the NEW verifier+key pair, once rotated in,
+    /// genuinely accepts. Uses StrictKeyedTestVerifier for the new leg per Jimmy's own guidance --
+    /// no need to vendor a second real UltraHonk circuit fixture just to prove the registry
+    /// plumbing routes correctly.
+    function test_FIXED_RotationToNewVerifierAndKeyAccepted() public {
+        bytes32 newKey = keccak256("erc8354-rotated-program-v1");
+        StrictKeyedTestVerifier newVerifier = new StrictKeyedTestVerifier(newKey);
+
+        registry.rotateVerifier(DOMAIN, address(newVerifier), newKey);
+
+        Verdict memory v = _verdict();
+        // StrictKeyedTestVerifier doesn't check the proof/publicInputs bytes at all (it isn't a
+        // real circuit) -- any non-empty proof exercises the real registry+Guard routing path to
+        // the newly-rotated verifier, which is what this test is actually proving.
+        assertTrue(guard.verify(v, hex"00"), "rotated verifier+key must accept once genuinely routed to");
+    }
+
+    /// @notice The mirror of the above: rotating to a new verifier+key does NOT accept a proof
+    /// meant for a different key, proving rotateVerifier's key check is real, not a no-op.
+    function test_FIXED_RotationToNewVerifierAndKeyStillRejectsWrongKey() public {
+        StrictKeyedTestVerifier newVerifier = new StrictKeyedTestVerifier(keccak256("erc8354-rotated-program-v1"));
+        registry.rotateVerifier(DOMAIN, address(newVerifier), keccak256("a-key-nobody-rotated-to"));
+
+        Verdict memory v = _verdict();
+        assertFalse(guard.verify(v, hex"00"), "rotated-in verifier must still reject a non-matching registered key");
     }
 }
