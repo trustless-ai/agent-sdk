@@ -4,14 +4,20 @@ pragma solidity ^0.8.27;
 import {Test} from "forge-std/Test.sol";
 import {ConfidentialPolicyVerdict} from "../../../contracts/mocks/verify/ERC8354/ConfidentialPolicyVerdict.sol";
 import {PolicyDomainRegistry} from "../../../contracts/mocks/verify/ERC8354/PolicyDomainRegistry.sol";
+import {IPolicyDomainRegistry} from "../../../contracts/mocks/verify/ERC8354/IPolicyDomainRegistry.sol";
 import {Verdict, PolicyKind} from "../../../contracts/mocks/verify/ERC8354/IConfidentialPolicyVerdict.sol";
 import {HonkVerifierAdapter} from "../../../contracts/mocks/verify/ERC8354/HonkVerifierAdapter.sol";
 import {StrictKeyedTestVerifier} from "../../../contracts/mocks/verify/ERC8354/StrictKeyedTestVerifier.sol";
 
 /// @notice Reproduction + regression coverage for Jimmy Shi's findings on PR #25 and PR #26
-/// (trustless-ai/agent-sdk, comments 2026-08-29T17:33:12Z and 2026-08-30T08:03:39-07:00). Every
-/// positive/negative control below is exercised with the real fixture proof or a real registry
-/// call, no mocks standing in for the boundary under test.
+/// (trustless-ai/agent-sdk, comments 2026-08-29T17:33:12Z and 2026-08-30T08:03:39-07:00). The
+/// real-fixture-proof reproduction path (the KNOWNGAP/FIXED tests exercising the vendored
+/// HonkVerifier via `guard.verify`/`adapter.verifyProof` with the real allowlist proof) uses no
+/// mocks standing in for that boundary. The registry-rotation-plumbing tests
+/// (`test_FIXED_MismatchedProgramKeyAtDeployRejects`, `test_FIXED_RotationToNewVerifierAndKey*`)
+/// deliberately use `StrictKeyedTestVerifier`, a minimal test verifier that checks `programKey`
+/// without a real circuit -- sufficient for proving the registry correctly routes to whichever
+/// verifier+key is currently registered, not a claim about proof verification itself.
 ///
 /// programKey (PR #25 finding 3, PR #26 5-point follow-up): FIXED and hardened. The adapter now
 /// derives its programKey from the vendored circuit's own VK_HASH (no independent
@@ -173,5 +179,26 @@ contract ConsumeRealReproTest is Test {
 
         Verdict memory v = _verdict();
         assertFalse(guard.verify(v, hex"00"), "rotated-in verifier must still reject a non-matching registered key");
+    }
+
+    /// @notice PR #26 second follow-up: rotateVerifier must emit BOTH the canonical
+    /// DomainProgramUpdated (so an integrator watching only the spec's own event still sees a
+    /// rotation's key change) and the richer local DomainVerifierRotated (which also carries the
+    /// verifier-address change). Asserts both events fire with the correct old/new values, in the
+    /// same call -- pinning this behavior so a future edit that drops either event breaks visibly.
+    function test_FIXED_RotateVerifierEmitsBothCanonicalAndExtensionEvents() public {
+        bytes32 newKey = keccak256("erc8354-rotated-program-v2");
+        StrictKeyedTestVerifier newVerifier = new StrictKeyedTestVerifier(newKey);
+        // setUp() registered DOMAIN with the adapter as its verifier and adapter.expectedProgramKey()
+        // as its programKey -- the "old" values this rotation moves away from.
+        address oldVerifierAddr = address(adapter);
+        bytes32 oldKey = adapter.expectedProgramKey();
+
+        vm.expectEmit(true, false, false, true, address(registry));
+        emit IPolicyDomainRegistry.DomainProgramUpdated(DOMAIN, oldKey, newKey);
+        vm.expectEmit(true, false, false, true, address(registry));
+        emit PolicyDomainRegistry.DomainVerifierRotated(DOMAIN, oldVerifierAddr, address(newVerifier), oldKey, newKey);
+
+        registry.rotateVerifier(DOMAIN, address(newVerifier), newKey);
     }
 }

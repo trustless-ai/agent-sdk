@@ -81,6 +81,20 @@ disconnected from which verifier the adapter actually wrapped. Hardened further:
   rotation is usable, not only fail-closed. Both independently reproduced by temporarily removing
   the fix and confirming the tests genuinely go red before restoring it.
 
+**Second hardening round, same day (Jimmy's follow-up on the hardening above):** `rotateVerifier`
+now emits BOTH the canonical `DomainProgramUpdated` (ERC-8354 advises integrators monitor this for
+any `programKey` change, rotation included -- omitting it meant an integrator watching only the
+canonical event would miss a rotation) and the richer local `DomainVerifierRotated` (also carries
+the verifier-address change). `DomainVerifierRotated` moved OFF `IPolicyDomainRegistry.sol` (the
+canonical companion interface) and onto the concrete `PolicyDomainRegistry` contract instead --
+the interface is byte-identical to the merged ERC-8354 asset again (re-verified: diffs clean
+against `assets/erc-8354/src/IPolicyDomainRegistry.sol` at the pinned merge commit), and the local
+extension event lives where it actually is one: a concrete-contract addition, not a claimed part
+of the spec's own interface. `ConsumeRealRepro.t.sol`'s top-level doc comment narrowed the
+"no mocks" claim to the real-fixture-proof reproduction path specifically -- the registry-rotation
+tests intentionally use `StrictKeyedTestVerifier`, which is a real mock for that boundary, not a
+claim about proof verification.
+
 ## Verify
 
 That table is the only place any of this is written down. `scripts/check-provenance.sh`

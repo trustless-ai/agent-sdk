@@ -15,12 +15,6 @@ interface IPolicyDomainRegistry {
     event DomainRegistered(bytes32 indexed domainId, address registrar, address verifier, bytes32 programKey);
     event DomainRootUpdated(bytes32 indexed domainId, bytes32 newRoot, uint64 version, uint64 updatedAt);
     event DomainProgramUpdated(bytes32 indexed domainId, bytes32 oldProgramKey, bytes32 newProgramKey);
-    /// @notice A genuine rotation: `verifier` and `programKey` updated together, atomically. Distinct
-    /// from `DomainProgramUpdated`, which changes only `programKey` and is intentionally
-    /// fail-closed (the old, now-stale `verifier` will reject the new key) rather than a rotation.
-    event DomainVerifierRotated(
-        bytes32 indexed domainId, address oldVerifier, address newVerifier, bytes32 oldProgramKey, bytes32 newProgramKey
-    );
     event DomainIdentityRegistryUpdated(bytes32 indexed domainId, address oldRegistry, address newRegistry);
     event DomainRevoked(bytes32 indexed domainId);
 
