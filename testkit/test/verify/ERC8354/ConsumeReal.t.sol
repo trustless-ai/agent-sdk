@@ -17,6 +17,16 @@ import {HonkVerifierAdapter, IHonkVerifier} from "../../../contracts/mocks/verif
 /// The Verdict values are not free parameters: the fixture proof is only valid for this exact set
 /// of public inputs, so they are carried over unchanged from the reference implementation's own
 /// ConsumeReal test.
+///
+/// PROOF-COVERAGE BOUNDARY (2026-08-29, Jimmy Shi's post-merge review of #25, point 7): this suite
+/// is a real cryptographic smoke test, not full circuit coverage. It exercises exactly one
+/// pre-generated fixture -- the allowlist ALLOW case -- plus a proof-bit mutation to confirm the
+/// verifier genuinely rejects tampering. It does NOT regenerate the proof from fresh inputs, and it
+/// does NOT exercise the other two circuits the adapter's own doc comment names (denylist,
+/// allowlist non-membership) -- there is no vendored fixture for either. Stating the boundary
+/// explicitly rather than letting "real UltraHonk proof end to end" be read as "every circuit
+/// covered" -- it proves the verify path is genuinely wired to real cryptography, not that every
+/// policyKind variant has been independently exercised against a real proof.
 contract ConsumeRealTest is Test {
     string constant PROOF_PATH = "./contracts/mocks/verify/ERC8354/fixtures/allowlist.proof";
 
