@@ -10,6 +10,7 @@ that is never disclosed on-chain.
   - `verify(v, proof)` is a read-only call that anyone can run against the domain's deployed verifier with its `programKey`.
   - `computeVerdictDigest` reproduces the EIP-712 digest an executor signs to authorize a relayer.
 - **NO** for the policy ruleset itself. The policy is never disclosed, and by design a `Verdict` is an integrity property only. It proves the committed interpreter evaluated the action and returned ALLOW, not that the policy is fair or correct.
+- **KNOWN LIMITATION** on the expiry field specifically: on-chain freshness enforcement in `ConfidentialPolicyVerdict.sol` confirms the *supplied* `expiry` on a `Verdict` has not lapsed, but `expiry` is not one of the circuit's public inputs (see `HonkVerifierAdapter.sol`'s own doc comment) -- the circuit never proves that specific expiry was the one actually authorized. A `verify` result of `true` establishes the decision, action binding, and policy-root/nullifier integrity properties above; it does not by itself establish that the expiry a caller supplies is the one the interpreter committed to. Tracked upstream at zexoverz/confidential-agent-policy-verdicts#3.
 
 A `verify` result of `true` from `MockVerifier` means the Guard delegated to
 `IVerifier` correctly, not that a proof cryptographically checked out.

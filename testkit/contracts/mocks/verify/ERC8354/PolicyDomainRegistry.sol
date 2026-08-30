@@ -6,6 +6,17 @@ import {IPolicyDomainRegistry} from "./IPolicyDomainRegistry.sol";
 /// @notice A concrete policy-domain registry. Per-domain admin registers the domain,
 /// rotates the root/program, and can revoke. Revocation bypasses the grace window.
 contract PolicyDomainRegistry is IPolicyDomainRegistry {
+    /// @notice A genuine rotation: `verifier` and `programKey` updated together, atomically.
+    /// Distinct from `DomainProgramUpdated` (which `rotateVerifier` also emits, below, so
+    /// integrators watching only the canonical event still see verifier-key rotations) --
+    /// `DomainVerifierRotated` additionally carries the verifier-address change and is a local
+    /// extension beyond the canonical `IPolicyDomainRegistry` interface, declared here on the
+    /// concrete contract rather than the interface so the interface stays byte-identical to the
+    /// merged ERC-8354 asset (see PROVENANCE.md).
+    event DomainVerifierRotated(
+        bytes32 indexed domainId, address oldVerifier, address newVerifier, bytes32 oldProgramKey, bytes32 newProgramKey
+    );
+
     struct RootEntry {
         bytes32 root;
         uint64 version;
@@ -80,10 +91,31 @@ contract PolicyDomainRegistry is IPolicyDomainRegistry {
         emit DomainRootUpdated(domainId, newRoot, version, uint64(block.timestamp));
     }
 
+    /// @notice Program-key-only update, intentionally NOT a rotation mechanism. `verifier` is
+    /// left unchanged, so if `newProgramKey` doesn't match the currently-registered verifier's own
+    /// expected key, the domain fails closed (every future verify/consume call rejects) until an
+    /// admin either reverts the key or calls `rotateVerifier` with a verifier that does match.
+    /// Kept as its own function for the deliberately-fail-closed use case; use `rotateVerifier` to
+    /// actually move a domain to a new verifier + key together.
     function updateProgram(bytes32 domainId, bytes32 newProgramKey) external onlyAdmin(domainId) {
         bytes32 old = _domains[domainId].programKey;
         _domains[domainId].programKey = newProgramKey;
         emit DomainProgramUpdated(domainId, old, newProgramKey);
+    }
+
+    /// @notice Genuine rotation: updates `verifier` and `programKey` together, atomically, so the
+    /// domain moves to a new verifier that is actually expected to accept `newProgramKey` -- unlike
+    /// `updateProgram` alone, this does not require a window where the domain is unverifiable.
+    /// Emits BOTH events: the canonical `DomainProgramUpdated` (ERC-8354 advises integrators
+    /// monitor this for any programKey change, rotation included) and the richer local
+    /// `DomainVerifierRotated` (also carries the verifier-address change).
+    function rotateVerifier(bytes32 domainId, address newVerifier, bytes32 newProgramKey) external onlyAdmin(domainId) {
+        address oldVerifier = _domains[domainId].verifier;
+        bytes32 oldProgramKey = _domains[domainId].programKey;
+        _domains[domainId].verifier = newVerifier;
+        _domains[domainId].programKey = newProgramKey;
+        emit DomainProgramUpdated(domainId, oldProgramKey, newProgramKey);
+        emit DomainVerifierRotated(domainId, oldVerifier, newVerifier, oldProgramKey, newProgramKey);
     }
 
     function revokeDomain(bytes32 domainId) external onlyAdmin(domainId) {

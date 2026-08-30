@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {IVerifier} from "./IVerifier.sol";
 import {Verdict} from "./IConfidentialPolicyVerdict.sol";
+import {HonkVerifier, VK_HASH} from "./HonkVerifier.sol";
 
 /// @notice Minimal view of the bb-generated UltraHonk verifier.
 interface IHonkVerifier {
@@ -20,17 +21,43 @@ interface IHonkVerifier {
 /// at the boundary without the proof having established it. `expiry` is NOT a circuit input — the
 /// Guard enforces it on-chain. All three circuits (allowlist ALLOW, denylist, allowlist
 /// non-membership) share this layout; only the constant each asserts for `policyKind` differs.
+///
+/// SECURITY (2026-08-29, real gap found and reproduced independently -- see
+/// test/verify/ERC8354/ConsumeRealRepro.t.sol): `expiry` is not a circuit public input at all
+/// (the Guard's on-chain freshness check confirms a *caller-supplied* expiry hasn't lapsed, but
+/// never proves the circuit authorized THAT specific expiry -- the same fixture proof verifies
+/// under any expiry value). Closing this requires the upstream Noir circuit
+/// (zexoverz/confidential-agent-policy-verdicts, see PROVENANCE.md) to add expiry as a public
+/// input, regenerate the verifying key, and reissue this adapter's vendored verifier + fixture --
+/// none of which is buildable inside this repo alone. Flagged upstream; not fixed here.
 contract HonkVerifierAdapter is IVerifier {
     IHonkVerifier public immutable honk;
 
-    constructor(IHonkVerifier _honk) {
-        honk = _honk;
+    /// @notice The program key this specific adapter instance is bound to. Derived from the
+    /// vendored circuit's own `VK_HASH` constant (HonkVerifier.sol), not an independent
+    /// constructor-supplied label -- so the key is cryptographically tied to which verifying key
+    /// this adapter actually wraps, and cannot be set to a value disconnected from the real
+    /// verifier. `honk` is constructed INSIDE this constructor (not injected) for the same reason:
+    /// the only way to change which verifier an adapter uses is to deploy a new adapter, which by
+    /// construction also gets that new verifier's own `VK_HASH`-derived key -- the two can never
+    /// drift apart. A domain's registered `programKey` (PolicyDomainRegistry.Domain.programKey)
+    /// must match this value for a proof to verify. Real program rotation (deploying a new circuit
+    /// and pointing a domain at it) means deploying a fresh adapter and calling
+    /// `PolicyDomainRegistry.rotateVerifier` to atomically update BOTH the domain's `verifier`
+    /// address and `programKey` together -- updating only `programKey` (the older
+    /// `updateProgram`) leaves the domain pointed at an adapter whose own key no longer matches,
+    /// which is intentionally fail-closed rather than a rotation mechanism.
+    bytes32 public immutable expectedProgramKey;
+
+    constructor() {
+        honk = IHonkVerifier(address(new HonkVerifier()));
+        expectedProgramKey = bytes32(VK_HASH);
     }
 
+    /// @param programKey the domain's currently-registered program key (PolicyDomainRegistry).
     /// @param publicInputs abi.encode(Verdict) as passed by the Guard.
     function verifyProof(
-        bytes32,
-        /* programKey */
+        bytes32 programKey,
         bytes calldata publicInputs,
         bytes calldata proof
     )
@@ -38,6 +65,10 @@ contract HonkVerifierAdapter is IVerifier {
         view
         returns (bool)
     {
+        // Mirrors the Guard's own "malformed proof returns false, never reverts" contract --
+        // a domain pointed at the wrong adapter is the same class of caller error as a
+        // malformed proof, not a distinct revert path.
+        if (programKey != expectedProgramKey) return false;
         Verdict memory v = abi.decode(publicInputs, (Verdict));
         return honk.verify(proof, _toPublicInputs(v));
     }

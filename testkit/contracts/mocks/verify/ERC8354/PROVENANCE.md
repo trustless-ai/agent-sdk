@@ -1,8 +1,11 @@
 # Provenance: vendored ERC-8354 verifier and fixture proof
 
-Four files in this directory are vendored, not written here. They are copied
+Three files in this directory are vendored, not written here. They are copied
 byte for byte, with no edits at all, so the claim is checkable by hash rather
-than taken on trust.
+than taken on trust. `HonkVerifierAdapter.sol` was originally a fourth, but
+diverged from upstream 2026-08-29 for a real security fix -- see
+"HonkVerifierAdapter.sol divergence" below, not still byte-identical, and no
+longer in the table this script checks.
 
 ## Source
 
@@ -26,9 +29,71 @@ relative to the root of the source repo above.
 | File | Upstream path | sha256 |
 |------|---------------|--------|
 | `HonkVerifier.sol` | `src/verifier/HonkVerifier.sol` | `04895a6bc51477739fbbb9801aee23e239aa885ed1048e75af9da76feabf8406` |
-| `HonkVerifierAdapter.sol` | `src/HonkVerifierAdapter.sol` | `085439d42da1087f397e5a2067788afd90735f6d7e2c6548fe54e7c52540feb4` |
 | `fixtures/allowlist.proof` | `test/fixtures/allowlist.proof` | `2f24e925c8aff9c7c30625f1a13b6c6834de5e88ce807c7af8ad04cec9ae4dce` |
 | `fixtures/allowlist.public_inputs` | `test/fixtures/allowlist.public_inputs` | `0dd630c7c529613882e19f22e88b28b1e838baf018a96a2c21f664f4ae5f0b75` |
+
+## HonkVerifierAdapter.sol divergence (2026-08-29)
+
+Jimmy Shi found, and this repo independently reproduced with the real fixture proof
+(`test/verify/ERC8354/ConsumeRealRepro.t.sol`, no mocks), that `HonkVerifierAdapter.sol`'s
+`verifyProof` took a `programKey` parameter and silently discarded it -- a domain rotating
+`PolicyDomainRegistry.updateProgram` to a different program kept accepting proofs meant for the
+old one, because nothing ever checked the parameter against what the adapter was actually
+deployed for.
+
+This is fixable without touching the circuit (unlike the `expiry` gap in the same PR review,
+which genuinely isn't -- see `HonkVerifierAdapter.sol`'s own doc comment): the adapter now derives
+`expectedProgramKey` from the vendored `HonkVerifier.sol`'s own `VK_HASH` constant (not an
+independent constructor-supplied label, per a further review round -- see 2026-08-30 hardening
+below) and rejects any call whose `programKey` argument doesn't match. Real cryptographic
+verification, malformed-proof-returns-false, and every other property of the vendored
+`HonkVerifier.sol`/fixture pair are unaffected -- this is Solidity-level glue around them, not a
+circuit change.
+
+**Sha256 of the pre-fix file, for anyone diffing against the original vendor commit above:**
+`085439d42da1087f397e5a2067788afd90735f6d7e2c6548fe54e7c52540feb4` (was `src/HonkVerifierAdapter.sol`
+at the pinned commit). The post-fix file's own hash is whatever `sha256sum` reports on the current
+tree -- deliberately not pinned here, since this file is no longer meant to be byte-identical to
+anything.
+
+Same bug likely exists in the upstream reference implementation this was vendored from
+(zexoverz/confidential-agent-policy-verdicts) -- **filed as zexoverz/confidential-agent-policy-verdicts#3**,
+so any other adopter vendoring the same `src/HonkVerifierAdapter.sol` has a tracked issue to find
+rather than rediscovering the gap independently.
+
+### 2026-08-30 hardening (Jimmy Shi's PR #26 review, 5-point follow-up)
+
+The original fix (above) let the deployer supply an arbitrary `_expectedProgramKey` at
+construction -- correct in that it was CHECKED, but the key itself was still an independent label
+disconnected from which verifier the adapter actually wrapped. Hardened further:
+- `expectedProgramKey` is now `bytes32(VK_HASH)`, read directly from the vendored circuit's own
+  constant, not a constructor parameter at all.
+- `honk` (the `HonkVerifier` instance) is now constructed INSIDE the adapter's own constructor
+  (`new HonkVerifier()`), not injected -- the only way to get a different verifier is to deploy a
+  new adapter, and that new adapter automatically gets that verifier's own `VK_HASH`-derived key.
+  The two can no longer drift apart by construction.
+- `PolicyDomainRegistry` gained `rotateVerifier(domainId, newVerifier, newProgramKey)`, which
+  atomically updates both fields together -- a genuine rotation mechanism, distinct from the
+  existing `updateProgram` (programKey-only, intentionally fail-closed if used alone).
+- Regression coverage now includes a direct-adapter-call test (varies only `programKey`, the real
+  Verdict/proof held unchanged) proving the check is load-bearing at the adapter's own boundary,
+  plus a rotation-acceptance test (`test_FIXED_RotationToNewVerifierAndKeyAccepted`) proving
+  rotation is usable, not only fail-closed. Both independently reproduced by temporarily removing
+  the fix and confirming the tests genuinely go red before restoring it.
+
+**Second hardening round, same day (Jimmy's follow-up on the hardening above):** `rotateVerifier`
+now emits BOTH the canonical `DomainProgramUpdated` (ERC-8354 advises integrators monitor this for
+any `programKey` change, rotation included -- omitting it meant an integrator watching only the
+canonical event would miss a rotation) and the richer local `DomainVerifierRotated` (also carries
+the verifier-address change). `DomainVerifierRotated` moved OFF `IPolicyDomainRegistry.sol` (the
+canonical companion interface) and onto the concrete `PolicyDomainRegistry` contract instead --
+the interface is byte-identical to the merged ERC-8354 asset again (re-verified: diffs clean
+against `assets/erc-8354/src/IPolicyDomainRegistry.sol` at the pinned merge commit), and the local
+extension event lives where it actually is one: a concrete-contract addition, not a claimed part
+of the spec's own interface. `ConsumeRealRepro.t.sol`'s top-level doc comment narrowed the
+"no mocks" claim to the real-fixture-proof reproduction path specifically -- the registry-rotation
+tests intentionally use `StrictKeyedTestVerifier`, which is a real mock for that boundary, not a
+claim about proof verification.
 
 ## Verify
 
