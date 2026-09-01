@@ -10,10 +10,12 @@ import {HonkVerifierAdapter} from "../../../contracts/mocks/verify/ERC8354/HonkV
 import {StrictKeyedTestVerifier} from "../../../contracts/mocks/verify/ERC8354/StrictKeyedTestVerifier.sol";
 
 /// @notice Reproduction + regression coverage for Jimmy Shi's findings on PR #25 and PR #26
-/// (trustless-ai/agent-sdk, comments 2026-08-29T17:33:12Z and 2026-08-30T08:03:39-07:00). The
-/// real-fixture-proof reproduction path (the KNOWNGAP/FIXED tests exercising the vendored
-/// HonkVerifier via `guard.verify`/`adapter.verifyProof` with the real allowlist proof) uses no
-/// mocks standing in for that boundary. The registry-rotation-plumbing tests
+/// (trustless-ai/agent-sdk, comments 2026-08-29T17:33:12Z and 2026-08-30T08:03:39-07:00). Both
+/// findings are now FIXED (programKey since PR #26; expiry since the 2026-09-01 upstream repin) --
+/// no known gap remains in this file as of this pass. The real-fixture-proof reproduction path
+/// (the FIXED tests exercising the vendored HonkVerifier via `guard.verify`/`adapter.verifyProof`
+/// with the real allowlist proof) uses no mocks standing in for that boundary. The
+/// registry-rotation-plumbing tests
 /// (`test_FIXED_MismatchedProgramKeyAtDeployRejects`, `test_FIXED_RotationToNewVerifierAndKey*`)
 /// deliberately use `StrictKeyedTestVerifier`, a minimal test verifier that checks `programKey`
 /// without a real circuit -- sufficient for proving the registry correctly routes to whichever
@@ -26,21 +28,24 @@ import {StrictKeyedTestVerifier} from "../../../contracts/mocks/verify/ERC8354/S
 /// mismatch regression is now load-bearing at the adapter's own boundary, not only through the
 /// full Guard/registry integration path.
 ///
-/// expiry (PR #25 finding 2): NOT fixed here, and can't be from inside this repo -- `expiry` was
-/// never a circuit public input (see HonkVerifierAdapter's own doc comment and PROVENANCE.md), so
-/// no Solidity-level change can bind it without the upstream Noir circuit
-/// (zexoverz/confidential-agent-policy-verdicts, issue #3 filed) adding it as one and this repo
-/// regenerating its vendored verifier + fixture against the new circuit. Kept as a named,
-/// currently-green characterization test documenting the CURRENT (insecure) behavior, so CI keeps
-/// surfacing the gap in the test list rather than it silently disappearing -- if this test ever
-/// starts failing, that means expiry IS bound now and the test (and this doc comment) need
-/// updating to match, not that something broke.
+/// expiry (PR #25 finding 2): FIXED upstream 2026-09-01 (zexoverz/confidential-agent-policy-verdicts
+/// commit d950ac1422cf79bafff11fcfb62c3e8b4ce3d782, "bind expiry as a public input on all three
+/// programs") and this repo repinned to pick it up (see PROVENANCE.md). `expiry` is now circuit
+/// public input [39]. `test_KNOWNGAP_SameProofVerifiesUnderDifferentExpiry` -- which asserted the
+/// insecure behavior and said in its own failure message "if this now fails, expiry IS bound --
+/// update this test" -- has been replaced below with `test_FIXED_DifferentExpiryNowRejects`,
+/// proving the secure behavior instead of merely documenting the old gap's absence.
 contract ConsumeRealReproTest is Test {
     string constant PROOF_PATH = "./contracts/mocks/verify/ERC8354/fixtures/allowlist.proof";
 
     bytes32 constant POLICY_ROOT = 0x053d4542d140ad2350a0ee79fae4a522821274e428bd881e7e803ecd816635ac;
     bytes32 constant ACTION_COMMITMENT = 0x7ccb7a4e9d51128b951cbeddefaec1140180a3d13f6eae6f06596dc432057cfa;
     bytes32 constant NULLIFIER = 0x041271fcaf479f6ab927df3a03f74d3809e9f49d880cd7a9595c8dc0a58a5e03;
+    /// The expiry the checked-in fixture proof was generated with (2026-09-01 repin, matches the
+    /// reference implementation's own test/ConsumeReal.t.sol exactly). Now that expiry is circuit
+    /// public input [39], it is no longer a free parameter the way `block.timestamp + 1 hours` was
+    /// before this repin -- the proof only verifies against this exact value.
+    uint64 constant FIXTURE_EXPIRY = 1900000000;
 
     PolicyDomainRegistry registry;
     ConfidentialPolicyVerdict guard;
@@ -65,19 +70,19 @@ contract ConsumeRealReproTest is Test {
             policyRoot: POLICY_ROOT,
             actionCommitment: ACTION_COMMITMENT,
             executor: EXECUTOR,
-            expiry: uint64(block.timestamp + 1 hours),
+            expiry: FIXTURE_EXPIRY,
             nullifier: NULLIFIER,
             decision: 1,
             policyKind: PolicyKind.ALLOWED
         });
     }
 
-    /// @notice KNOWN, UNFIXED GAP -- see contract-level doc comment. This is a real, live
-    /// disclosure, not a placeholder: the same fixture proof verifies whether or not the Verdict's
-    /// expiry field matches what was actually authorized, because expiry is not a circuit public
-    /// input. This test intentionally documents the current (insecure) behavior rather than
-    /// asserting the secure one, so removing it silently would be the actual regression.
-    function test_KNOWNGAP_SameProofVerifiesUnderDifferentExpiry() public view {
+    /// @notice FIXED (2026-09-01, upstream repin): the same fixture proof now REJECTS under a
+    /// tampered expiry, because expiry is circuit public input [39] -- the circuit's reduction
+    /// step fails when the supplied expiry doesn't match what was actually proven. This replaces
+    /// the old test_KNOWNGAP_SameProofVerifiesUnderDifferentExpiry, which asserted the opposite
+    /// (insecure) behavior and named exactly this replacement in its own failure message.
+    function test_FIXED_DifferentExpiryNowRejects() public view {
         bytes memory proof = vm.readFileBinary(PROOF_PATH);
 
         Verdict memory original = _verdict();
@@ -85,9 +90,9 @@ contract ConsumeRealReproTest is Test {
 
         Verdict memory tamperedExpiry = _verdict();
         tamperedExpiry.expiry = original.expiry + 999 days; // a wildly different, unauthorized expiry
-        assertTrue(
+        assertFalse(
             guard.verify(tamperedExpiry, proof),
-            "if this now fails, expiry IS bound -- update this test to assertFalse and the doc comment"
+            "expiry is now a circuit public input -- a tampered expiry must reject, not silently accept"
         );
     }
 
