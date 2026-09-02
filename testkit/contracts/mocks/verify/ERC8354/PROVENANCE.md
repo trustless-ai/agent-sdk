@@ -48,14 +48,23 @@ Jimmy Shi found, and this repo independently reproduced with the real fixture pr
 old one, because nothing ever checked the parameter against what the adapter was actually
 deployed for.
 
-This is fixable without touching the circuit (unlike the `expiry` gap in the same PR review,
-which genuinely isn't -- see `HonkVerifierAdapter.sol`'s own doc comment): the adapter now derives
-`expectedProgramKey` from the vendored `HonkVerifier.sol`'s own `VK_HASH` constant (not an
+This was fixable without touching the circuit (unlike the `expiry` gap in the same PR review,
+which at the time genuinely wasn't -- see `HonkVerifierAdapter.sol`'s own doc comment): the adapter
+derives `expectedProgramKey` from the vendored `HonkVerifier.sol`'s own `VK_HASH` constant (not an
 independent constructor-supplied label, per a further review round -- see 2026-08-30 hardening
 below) and rejects any call whose `programKey` argument doesn't match. Real cryptographic
 verification, malformed-proof-returns-false, and every other property of the vendored
 `HonkVerifier.sol`/fixture pair are unaffected -- this is Solidity-level glue around them, not a
 circuit change.
+
+**UPDATE 2026-09-01: the `expiry` gap referenced above is also closed now**, on the circuit side
+rather than the adapter side -- the upstream circuit was revised to add `expiry` as public input
+`[39]` (commit `d950ac1`), repinned here in `agent-sdk#28`; see the `go`/`python`/`typescript`
+READMEs' own "FIXED" notes for the resulting verification-property change. The sentence above
+described real, different fixability for the two gaps at the time this section was first written;
+both are closed now, by two separate fixes on two different sides of the circuit boundary -- kept
+as-written rather than rewritten, since it was accurate when written and the update stands next
+to it.
 
 **Sha256 of the pre-fix file, for anyone diffing against the original vendor commit above:**
 `085439d42da1087f397e5a2067788afd90735f6d7e2c6548fe54e7c52540feb4` (was `src/HonkVerifierAdapter.sol`
@@ -63,10 +72,12 @@ at the pinned commit). The post-fix file's own hash is whatever `sha256sum` repo
 tree -- deliberately not pinned here, since this file is no longer meant to be byte-identical to
 anything.
 
-Same bug likely exists in the upstream reference implementation this was vendored from
-(zexoverz/confidential-agent-policy-verdicts) -- **filed as zexoverz/confidential-agent-policy-verdicts#3**,
-so any other adopter vendoring the same `src/HonkVerifierAdapter.sol` has a tracked issue to find
-rather than rediscovering the gap independently.
+Same bug likely existed in the upstream reference implementation this was vendored from
+(zexoverz/confidential-agent-policy-verdicts) -- **filed as
+zexoverz/confidential-agent-policy-verdicts#3, closed 2026-09-01 as completed at commit
+`d950ac1`** (the same commit this repo's `agent-sdk#28` repins), so an adopter vendoring
+`src/HonkVerifierAdapter.sol` from a commit at or after `d950ac1` inherits the fix directly rather
+than needing this repo's own separate adapter patch.
 
 ### 2026-08-30 hardening (Jimmy Shi's PR #26 review, 5-point follow-up)
 
