@@ -32,6 +32,11 @@ contract ConsumeRealTest is Test {
     bytes32 constant POLICY_ROOT = 0x053d4542d140ad2350a0ee79fae4a522821274e428bd881e7e803ecd816635ac;
     bytes32 constant ACTION_COMMITMENT = 0x7ccb7a4e9d51128b951cbeddefaec1140180a3d13f6eae6f06596dc432057cfa;
     bytes32 constant NULLIFIER = 0x041271fcaf479f6ab927df3a03f74d3809e9f49d880cd7a9595c8dc0a58a5e03;
+    /// The expiry the checked-in fixture proof was generated with (2026-09-01 repin, matches the
+    /// reference implementation's own test/ConsumeReal.t.sol exactly). Now that expiry is circuit
+    /// public input [39], it is no longer a free parameter the way `block.timestamp + 1 hours` was
+    /// before this repin -- the proof only verifies against this exact value.
+    uint64 constant FIXTURE_EXPIRY = 1900000000;
 
     PolicyDomainRegistry registry;
     ConfidentialPolicyVerdict guard;
@@ -59,7 +64,7 @@ contract ConsumeRealTest is Test {
             policyRoot: POLICY_ROOT,
             actionCommitment: ACTION_COMMITMENT,
             executor: EXECUTOR,
-            expiry: uint64(block.timestamp + 1 hours),
+            expiry: FIXTURE_EXPIRY,
             nullifier: NULLIFIER,
             decision: 1,
             policyKind: PolicyKind.ALLOWED
