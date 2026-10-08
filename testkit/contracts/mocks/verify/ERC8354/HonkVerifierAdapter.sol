@@ -13,23 +13,25 @@ interface IHonkVerifier {
 /// @notice Adapts the Noir/UltraHonk allowlist verifier to the ERC's `IVerifier`. It serializes the
 /// Verdict fields that are the circuit's public inputs and calls the generated Honk verifier.
 ///
-/// The circuit's public inputs, in `main()` order, are 39 elements:
+/// The circuit's public inputs, in `main()` order, are 40 elements:
 ///   [0] agentId, [1] domainId, [2] policyRoot, [3..34] the 32 bytes of actionCommitment
-///   (each byte as a field element), [35] nullifier, [36] decision, [37] policyKind, [38] executor.
+///   (each byte as a field element), [35] nullifier, [36] decision, [37] policyKind, [38] executor,
+///   [39] expiry.
 /// `executor` is a committed circuit input (the proof binds to it, per the spec's Security
 /// Considerations). `policyKind` is committed too, so the four-state taxonomy cannot be asserted
-/// at the boundary without the proof having established it. `expiry` is NOT a circuit input — the
-/// Guard enforces it on-chain. All three circuits (allowlist ALLOW, denylist, allowlist
-/// non-membership) share this layout; only the constant each asserts for `policyKind` differs.
+/// at the boundary without the proof having established it. All three circuits (allowlist ALLOW,
+/// denylist, allowlist non-membership) share this layout; only the constant each asserts for
+/// `policyKind` differs.
 ///
 /// SECURITY (2026-08-29, real gap found and reproduced independently -- see
-/// test/verify/ERC8354/ConsumeRealRepro.t.sol): `expiry` is not a circuit public input at all
-/// (the Guard's on-chain freshness check confirms a *caller-supplied* expiry hasn't lapsed, but
-/// never proves the circuit authorized THAT specific expiry -- the same fixture proof verifies
-/// under any expiry value). Closing this requires the upstream Noir circuit
-/// (zexoverz/confidential-agent-policy-verdicts, see PROVENANCE.md) to add expiry as a public
-/// input, regenerate the verifying key, and reissue this adapter's vendored verifier + fixture --
-/// none of which is buildable inside this repo alone. Flagged upstream; not fixed here.
+/// test/verify/ERC8354/ConsumeRealRepro.t.sol; CLOSED 2026-09-01 upstream): `expiry` was not a
+/// circuit public input (the Guard's on-chain freshness check confirmed a *caller-supplied* expiry
+/// hadn't lapsed, but never proved the circuit authorized THAT specific expiry -- the same fixture
+/// proof verified under any expiry value). Fixed upstream in
+/// zexoverz/confidential-agent-policy-verdicts (commit d950ac1422cf79bafff11fcfb62c3e8b4ce3d782,
+/// "bind expiry as a public input on all three programs"): expiry is now public input [39],
+/// appended last so no existing index moved. This repo's vendored verifier + fixtures were
+/// repinned to that commit to pick up the fix (see PROVENANCE.md).
 contract HonkVerifierAdapter is IVerifier {
     IHonkVerifier public immutable honk;
 
@@ -73,9 +75,9 @@ contract HonkVerifierAdapter is IVerifier {
         return honk.verify(proof, _toPublicInputs(v));
     }
 
-    /// @notice The 39-element public-input vector the circuit expects, from a Verdict.
+    /// @notice The 40-element public-input vector the circuit expects, from a Verdict.
     function _toPublicInputs(Verdict memory v) internal pure returns (bytes32[] memory pi) {
-        pi = new bytes32[](39);
+        pi = new bytes32[](40);
         pi[0] = bytes32(v.agentId);
         pi[1] = v.domainId;
         pi[2] = v.policyRoot;
@@ -86,5 +88,6 @@ contract HonkVerifierAdapter is IVerifier {
         pi[36] = bytes32(uint256(v.decision));
         pi[37] = bytes32(uint256(v.policyKind));
         pi[38] = bytes32(uint256(uint160(v.executor)));
+        pi[39] = bytes32(uint256(v.expiry));
     }
 }
